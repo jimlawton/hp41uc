@@ -39,8 +39,6 @@ along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
 #include <ctype.h>
 #include <conio.h>
 
-typedef unsigned char UCHAR;
-
 // file types
 typedef enum {
 	FILE_BIN,
@@ -98,30 +96,30 @@ void txttoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
 
 void barcode(char *infile, char *outfile, char *title);
 
-int decompile(UCHAR *out_buffer, int out_size,
-	UCHAR **pin_buffer, int *pin_count,
+int decompile(unsigned char *out_buffer, int out_size,
+	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend);
 
-int compile(UCHAR *out_buffer, int out_size,
-	UCHAR **pin_buffer, int *pin_count,
+int compile(unsigned char *out_buffer, int out_size,
+	unsigned char **pin_buffer, int *pin_count,
 	COMPILE_FLAG *pflag, int *ppending, int *pend_count);
 
 
 int hextoascii(char *ascii_buffer,
-	UCHAR *hex_buffer, int hex_count);
-int asciitohex(UCHAR *hex_buffer,
+	unsigned char *hex_buffer, int hex_count);
+int asciitohex(unsigned char *hex_buffer,
 	char *ascii_buffer, int ascii_count);
-int nonxdigit_buffer(UCHAR *buffer, int count);
+int nonxdigit_buffer(unsigned char *buffer, int count);
 
-int seek_end(UCHAR *buffer, int count);
+int seek_end(unsigned char *buffer, int count);
 
-void compile_end(UCHAR *buffer, int bytes);
+void compile_end(unsigned char *buffer, int bytes);
 
 int oktowrite(char *path);
 
 int getiopath(char *in_file,
 	char *in_ext,
-struct _finddata_t *ffd,
+	struct _finddata_t *ffd,
 	intptr_t *hFindFile,
 	int max_in_files,
 	char *in_dir,
@@ -146,7 +144,7 @@ long read_lif_dir(FILE *fin, char *inpath, long *plength, char *name,
 
 long read_lif_hdr(FILE *fin, char *inpath, long size);
 
-long get_lif_size(UCHAR *buffer2, long length);
+long get_lif_size(unsigned char *buffer2, long length);
 
 void get_lif_name(char *pname, char *name, char *filename);
 
@@ -163,27 +161,27 @@ void copy_file(FILE *fout, char *outpath,
 
 int copy_blocks(FILE *fout, char *outpath,
 	FILE_TYPE outtype, long *poutlength,
-	long *psize, UCHAR *pchksum, long *pstartblk,
+	long *psize, unsigned char *pchksum, long *pstartblk,
 	FILE *fin, char *inpath,
 	FILE_TYPE intype, long inlength);
 
 int copy_raw_blocks(FILE *fout, char *outpath, FILE_TYPE outtype,
 	long *poutlength, long *psize,
-	UCHAR *pchksum, long *pstartblk,
+	unsigned char *pchksum, long *pstartblk,
 	FILE *fin, char *inpath, long inlength);
 
 int copy_dat_blocks(FILE *fout, char *outpath, FILE_TYPE outtype,
 	long *poutlength, long *psize,
-	UCHAR *pchksum, long *pstartblk,
+	unsigned char *pchksum, long *pstartblk,
 	FILE *fin, char *inpath, long inlength);
 
 int copy_txt_blocks(FILE *fout, char *outpath, FILE_TYPE outtype,
 	long *poutlength, long *psize,
-	UCHAR *pchksum, long *pstartblk,
+	unsigned char *pchksum, long *pstartblk,
 	FILE *fin, char *inpath, long inlength);
 
 long write_raw_checksum(FILE *fout, char *outpath, long *poutlength,
-	UCHAR *buffer, long bufsize,
+	unsigned char *buffer, long bufsize,
 	unsigned char chksum);
 
 long write_dat_checksum(FILE *fout, char *outpath, long *poutlength,

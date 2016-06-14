@@ -335,7 +335,7 @@ void barcode(char *infile, char *outfile, char *title)
 					fprintf(fout, "%sProgram Registers Needed: %ld",
 						pcl_left_margin, reg);
 				}
-				else { // PRINTER_NONE 
+				else { // PRINTER_NONE
 					fprintf(fout, "Program Registers Needed: %ld", reg);
 				}
 

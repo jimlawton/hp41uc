@@ -24,12 +24,12 @@ along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 typedef struct {
-	UCHAR *prefix;
+	unsigned char *prefix;
 	int  code;
 } FCN;
 
 typedef struct {
-	UCHAR *prefix;
+	unsigned char *prefix;
 	int  code[2];
 } XROM;
 
@@ -43,41 +43,41 @@ typedef enum {
 } COMPILE_STATE;
 
 
-int get_line_args(UCHAR *line_argv[], UCHAR **line_ptr);
+int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr);
 
-int compile_args(UCHAR *code_buffer,
+int compile_args(unsigned char *code_buffer,
 	int line_argc,
-	UCHAR *line_argv[]);
+	unsigned char *line_argv[]);
 
-int compile_num(UCHAR *code, UCHAR *num);
-int compile_text(UCHAR *code, UCHAR *text, int count);
-int compile_alpha(UCHAR *code, UCHAR *prefix, UCHAR *alpha);
-int compile_arg1(UCHAR *code, UCHAR *prefix);
-int compile_arg2(UCHAR *code, UCHAR *prefix, UCHAR *postfix);
-int compile_arg3(UCHAR *code, UCHAR *prefix, UCHAR *pind, UCHAR *postfix);
-int compile_label(UCHAR *code, UCHAR *label, UCHAR *alpha, UCHAR *key);
+int compile_num(unsigned char *code, unsigned char *num);
+int compile_text(unsigned char *code, unsigned char *text, int count);
+int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alpha);
+int compile_arg1(unsigned char *code, unsigned char *prefix);
+int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *postfix);
+int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *pind, unsigned char *postfix);
+int compile_label(unsigned char *code, unsigned char *label, unsigned char *alpha, unsigned char *key);
 
-int get_numeric_prefix(UCHAR *numeric, UCHAR *buffer);
+int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer);
 
-int get_text_prefix(UCHAR *text, UCHAR *buffer, int *pcount);
+int get_text_prefix(unsigned char *text, unsigned char *buffer, int *pcount);
 
-int get_alpha_postfix(UCHAR *alpha, UCHAR *buffer);
+int get_alpha_postfix(unsigned char *alpha, unsigned char *buffer);
 
-int is_postfix(UCHAR *postfix, int *pindex);
+int is_postfix(unsigned char *postfix, int *pindex);
 
-int parse_text(UCHAR *text, UCHAR *buffer, int *pcount);
+int parse_text(unsigned char *text, unsigned char *buffer, int *pcount);
 
-int is_inquotes(UCHAR *buffer);
+int is_inquotes(unsigned char *buffer);
 
-int is_append(UCHAR *prefix);
+int is_append(unsigned char *prefix);
 
-int is_text(UCHAR *prefix);
+int is_text(unsigned char *prefix);
 
 int is_local_label(char *alpha);
 
-int get_key(UCHAR *key);
+int get_key(unsigned char *key);
 
-char get_xdigit(UCHAR xdigit);
+char get_xdigit(unsigned char xdigit);
 
 FCN alt_fcn1[] = {
 	"ä+", 0x47,

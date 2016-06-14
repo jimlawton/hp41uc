@@ -36,15 +36,15 @@ int global_label = 0;
 int global_count = 0;
 int global_end = 0;
 
-int compile(UCHAR *out_buffer, int out_size,
-	UCHAR **pin_buffer, int *pin_count,
+int compile(unsigned char *out_buffer, int out_size,
+	unsigned char **pin_buffer, int *pin_count,
 	COMPILE_FLAG *pflag, int *ppending, int *pend_count)
 {
 	COMPILE_FLAG flag;
 	int done = 0;
 	int consumed = 0;
 	int produced = 0;
-	UCHAR c, *inp, *outp;
+	unsigned char c, *inp, *outp;
 	static int source_line = 0;
 	static int line_end = 0;
 	static int line_index = 0;
@@ -212,9 +212,9 @@ int compile(UCHAR *out_buffer, int out_size,
 }
 
 
-int get_line_args(UCHAR *line_argv[], UCHAR **line_ptr)
+int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr)
 {
-	UCHAR *pc;
+	unsigned char *pc;
 	int i, count, done;
 
 	count = 0;
@@ -286,7 +286,7 @@ int get_line_args(UCHAR *line_argv[], UCHAR **line_ptr)
 #define MAX_ALPHA       15
 
 
-int get_numeric_prefix(UCHAR *numeric, UCHAR *buffer)
+int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 {
 	int i;
 	int error = 0;
@@ -385,11 +385,11 @@ int get_numeric_prefix(UCHAR *numeric, UCHAR *buffer)
 }
 
 
-int get_text_prefix(UCHAR *text, UCHAR *buffer, int *pcount)
+int get_text_prefix(unsigned char *text, unsigned char *buffer, int *pcount)
 {
 	int i, j, k;
 	int error = 1, istext = 1;
-	UCHAR lbuffer[MAX_LINE];
+	unsigned char lbuffer[MAX_LINE];
 
 	// get start-quote
 	for (i = 0, k = 0; (size_t)i < strlen(buffer) && k == 0; ++i) {
@@ -436,10 +436,10 @@ int get_text_prefix(UCHAR *text, UCHAR *buffer, int *pcount)
 	return(!error);
 }
 
-int get_alpha_postfix(UCHAR *alpha, UCHAR *buffer)
+int get_alpha_postfix(unsigned char *alpha, unsigned char *buffer)
 {
 	int i;
-	UCHAR lbuffer[MAX_LINE];
+	unsigned char lbuffer[MAX_LINE];
 
 	// end-quote?
 	if ((i = is_inquotes(buffer))) {
@@ -460,7 +460,7 @@ int get_alpha_postfix(UCHAR *alpha, UCHAR *buffer)
 }
 
 
-int compile_num(UCHAR *code, UCHAR *num)
+int compile_num(unsigned char *code, unsigned char *num)
 {
 	int i, count;
 
@@ -481,7 +481,7 @@ int compile_num(UCHAR *code, UCHAR *num)
 }
 
 
-int compile_text(UCHAR *code, UCHAR *text, int count)
+int compile_text(unsigned char *code, unsigned char *text, int count)
 {
 	// TEXT0..15
 	code[0] = 0xF0 + count;
@@ -492,21 +492,21 @@ int compile_text(UCHAR *code, UCHAR *text, int count)
 }
 
 
-int compile_alpha(UCHAR *code, UCHAR *prefix, UCHAR *alpha)
+int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alpha)
 {
 	int i, j;
 	int local, count;
-	UCHAR mm, ff;
+	unsigned char mm, ff;
 
 #if DO_ESC
-	UCHAR lbuffer[MAX_LINE];
+	unsigned char lbuffer[MAX_LINE];
 
 	strcpy(lbuffer, alpha);
 	if (parse_text(alpha, lbuffer, &count)) {
 		alpha[count] = '\0';
 	}
 #else
-	count = strlen( alpha );
+	count = strlen(alpha);
 #endif
 
 	local = is_local_label(alpha);
@@ -587,8 +587,8 @@ int compile_alpha(UCHAR *code, UCHAR *prefix, UCHAR *alpha)
 		j = sizeof(xrom_fcn) / sizeof(XROM);
 		for (i = 0; i < j; ++i) {
 			if (_stricmp(alpha, xrom_fcn[i].prefix) == 0) {
-				mm = (UCHAR)xrom_fcn[i].code[0];
-				ff = (UCHAR)xrom_fcn[i].code[1];
+				mm = (unsigned char)xrom_fcn[i].code[0];
+				ff = (unsigned char)xrom_fcn[i].code[1];
 				code[0] = 0xA0 + (mm >> 2);
 				code[1] = ((mm & 0x03) << 6) + ff;
 				return(2);
@@ -605,10 +605,10 @@ int compile_alpha(UCHAR *code, UCHAR *prefix, UCHAR *alpha)
 }
 
 
-int compile_arg1(UCHAR *code, UCHAR *prefix)
+int compile_arg1(unsigned char *code, unsigned char *prefix)
 {
 	int i, j;
-	UCHAR mm, ff;
+	unsigned char mm, ff;
 
 	// .END.
 	if (_stricmp(prefix, "END") == 0 ||
@@ -624,8 +624,8 @@ int compile_arg1(UCHAR *code, UCHAR *prefix)
 	j = sizeof(xrom_fcn) / sizeof(XROM);
 	for (i = 0; i < j; ++i) {
 		if (_stricmp(prefix, xrom_fcn[i].prefix) == 0) {
-			mm = (UCHAR)xrom_fcn[i].code[0];
-			ff = (UCHAR)xrom_fcn[i].code[1];
+			mm = (unsigned char)xrom_fcn[i].code[0];
+			ff = (unsigned char)xrom_fcn[i].code[1];
 			code[0] = 0xA0 + (mm >> 2);
 			code[1] = ((mm & 0x03) << 6) + ff;
 			return(2);
@@ -636,7 +636,7 @@ int compile_arg1(UCHAR *code, UCHAR *prefix)
 	j = sizeof(alt_fcn1) / sizeof(FCN);
 	for (i = 0; i < j; ++i) {
 		if (_stricmp(prefix, alt_fcn1[i].prefix) == 0) {
-			code[0] = (UCHAR)alt_fcn1[i].code;
+			code[0] = (unsigned char)alt_fcn1[i].code;
 			return(1);
 		}
 	}
@@ -656,15 +656,15 @@ int compile_arg1(UCHAR *code, UCHAR *prefix)
 }
 
 
-int compile_arg2(UCHAR *code, UCHAR *prefix, UCHAR *postfix)
+int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *postfix)
 {
 	int i, j, k;
 	long m, f;
-	UCHAR mm, ff;
-	UCHAR *pm, *pf, *stop;
-	UCHAR lbuffer[MAX_LINE];
-	UCHAR num_postfix[] = "0#";
-	UCHAR *ppostfix = postfix;
+	unsigned char mm, ff;
+	unsigned char *pm, *pf, *stop;
+	unsigned char lbuffer[MAX_LINE];
+	unsigned char num_postfix[] = "0#";
+	unsigned char *ppostfix = postfix;
 
 	// XROM mm,ff
 	if (_stricmp(prefix, "XROM") == 0) {
@@ -682,8 +682,8 @@ int compile_arg2(UCHAR *code, UCHAR *prefix, UCHAR *postfix)
 						if (j) {
 							f = strtol(pf, &stop, 10);
 							if (f >= 0 && f <= 63) {
-								mm = (UCHAR)m;
-								ff = (UCHAR)f;
+								mm = (unsigned char)m;
+								ff = (unsigned char)f;
 								code[0] = 0xA0 + (mm >> 2);
 								code[1] = ((mm & 0x03) << 6) + ff;
 								return(2);
@@ -781,7 +781,7 @@ int compile_arg2(UCHAR *code, UCHAR *prefix, UCHAR *postfix)
 			k = sizeof(alt_fcn2) / sizeof(FCN);
 			for (j = 0; j < k; ++j) {
 				if (_stricmp(prefix, alt_fcn2[j].prefix) == 0) {
-					code[0] = (UCHAR)alt_fcn2[j].code;
+					code[0] = (unsigned char)alt_fcn2[j].code;
 					code[1] = i;
 					return(2);
 				}
@@ -814,12 +814,12 @@ int compile_arg2(UCHAR *code, UCHAR *prefix, UCHAR *postfix)
 }
 
 
-int compile_arg3(UCHAR *code, UCHAR *prefix, UCHAR *ind, UCHAR *postfix)
+int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind, unsigned char *postfix)
 {
 	int i, j, k;
-	UCHAR lbuffer[MAX_LINE];
-	UCHAR num_postfix[] = "0#";
-	UCHAR *ppostfix = postfix;
+	unsigned char lbuffer[MAX_LINE];
+	unsigned char num_postfix[] = "0#";
+	unsigned char *ppostfix = postfix;
 
 	// add leading "0"
 	if (strlen(postfix) == 1 &&
@@ -850,7 +850,7 @@ int compile_arg3(UCHAR *code, UCHAR *prefix, UCHAR *ind, UCHAR *postfix)
 		k = sizeof(alt_fcn2) / sizeof(FCN);
 		for (j = 0; j < k; ++j) {
 			if (_stricmp(prefix, alt_fcn2[j].prefix) == 0) {
-				code[0] = (UCHAR)alt_fcn2[j].code;
+				code[0] = (unsigned char)alt_fcn2[j].code;
 				code[1] = i + 0x80;
 				return(2);
 			}
@@ -898,7 +898,7 @@ int compile_arg3(UCHAR *code, UCHAR *prefix, UCHAR *ind, UCHAR *postfix)
 }
 
 
-int compile_label(UCHAR *code, UCHAR *label, UCHAR *alpha, UCHAR *key)
+int compile_label(unsigned char *code, unsigned char *label, unsigned char *alpha, unsigned char *key)
 {
 	int asn, count;
 
@@ -925,7 +925,7 @@ int compile_label(UCHAR *code, UCHAR *label, UCHAR *alpha, UCHAR *key)
 }
 
 
-void compile_end(UCHAR *buffer, int bytes)
+void compile_end(unsigned char *buffer, int bytes)
 {
 	int a, bc;
 
@@ -960,7 +960,7 @@ void compile_end(UCHAR *buffer, int bytes)
 }
 
 
-int is_postfix(UCHAR *postfix, int *pindex)
+int is_postfix(unsigned char *postfix, int *pindex)
 {
 	int i, j;
 
@@ -1007,7 +1007,7 @@ int is_postfix(UCHAR *postfix, int *pindex)
 }
 
 
-int parse_text(UCHAR *text, UCHAR *buffer, int *pcount)
+int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 {
 	int i, j, k, n;
 
@@ -1155,7 +1155,7 @@ int parse_text(UCHAR *text, UCHAR *buffer, int *pcount)
 }
 
 
-int is_inquotes(UCHAR *buffer)
+int is_inquotes(unsigned char *buffer)
 {
 	int i;
 
@@ -1178,7 +1178,7 @@ int is_inquotes(UCHAR *buffer)
 }
 
 
-int is_append(UCHAR *prefix)
+int is_append(unsigned char *prefix)
 {
 	return(strcmp(prefix, "\xC3") == 0 ||
 		strcmp(prefix, ">") == 0 ||
@@ -1192,7 +1192,7 @@ int is_append(UCHAR *prefix)
 }
 
 
-int is_text(UCHAR *prefix)
+int is_text(unsigned char *prefix)
 {
 	return(_stricmp(prefix, "T") == 0 ||
 		_stricmp(prefix, "TXT") == 0 ||
@@ -1222,12 +1222,12 @@ int is_local_label(char *alpha)
 }
 
 
-int get_key(UCHAR *key)
+int get_key(unsigned char *key)
 {
 	long rc;
 	int row, col, shift;
-	UCHAR *pkey, *stop;
-	UCHAR lbuffer[MAX_LINE];
+	unsigned char *pkey, *stop;
+	unsigned char lbuffer[MAX_LINE];
 
 	strcpy(lbuffer, key);
 	if ((pkey = strchr(lbuffer, ':'))) {
@@ -1264,7 +1264,7 @@ int get_key(UCHAR *key)
 	return(0);
 }
 
-char get_xdigit(UCHAR xdigit)
+char get_xdigit(unsigned char xdigit)
 {
 	if (isdigit(xdigit))
 		return(xdigit - '0');
@@ -1273,15 +1273,15 @@ char get_xdigit(UCHAR xdigit)
 }
 
 
-int compile_args(UCHAR *code_buffer,
+int compile_args(unsigned char *code_buffer,
 	int line_argc,
-	UCHAR *line_argv[])
+	unsigned char *line_argv[])
 {
 	static int fnumeric = 0;
 	int base, size, count;
-	UCHAR lbuffer[MAX_LINE];
-	UCHAR num_buffer[MAX_NUMERIC + 1];
-	UCHAR text_buffer[MAX_ALPHA + 1];
+	unsigned char lbuffer[MAX_LINE];
+	unsigned char num_buffer[MAX_NUMERIC + 1];
+	unsigned char text_buffer[MAX_ALPHA + 1];
 
 	base = 0;
 	if (line_numbers && isdigit(line_argv[0][0])) {

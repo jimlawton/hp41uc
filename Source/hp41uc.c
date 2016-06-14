@@ -580,7 +580,7 @@ int oktowrite(char *path)
 
 int getiopath(char *in_file,
 	char *in_ext,
-struct _finddata_t *ffd,
+	struct _finddata_t *ffd,
 	intptr_t *hFindFile,
 	int max_in_files,
 	char *in_dir,

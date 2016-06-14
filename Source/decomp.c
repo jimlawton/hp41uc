@@ -1223,7 +1223,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 #else
 							*outp++ = '\\';
 							sprintf(buffer6, "%02X", c);
-							memcpy( outp, buffer6, 2 );
+							memcpy(outp, buffer6, 2);
 							outp += 2;
 							produced += 3;
 #endif
