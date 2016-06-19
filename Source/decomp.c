@@ -1,30 +1,63 @@
 /*
-HP41UC.EXE
+HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
-Build environment: Microsoft Visual Studio 32-bit compiler.
+Build environment: Microsoft Visual Studio or GNU C compiler.
 */
 
 /*
-This file is part of HP41UC.EXE.
+This file is part of HP41UC.
 
-HP41UC.EXE is free software: you can redistribute it and/or modify
+HP41UC is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-HP41UC.EXE is distributed in the hope that it will be useful,
+HP41UC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
+along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "hp41uc.h"
 #include "decomp.h"
+
+/* decoder states */
+typedef enum {
+	SEEK_BYTE1,
+	SEEK_BYTE2_OF_2,
+	SEEK_BYTE2_OF_3,
+	SEEK_BYTE3_OF_3,
+	SEEK_BYTE2_GLOBAL,
+	SEEK_BYTE3_GLOBAL,
+	SEEK_BYTE4_GLOBAL,
+	SEEK_BYTE2_ALPHA,
+	SEEK_BYTE_ALPHA,
+} SEEK_STATE;
+
+static int count;
+static int end = 0;
+static int line = 1;
+static int numeric = 0;
+static int synth_flag;
+static int synth_count;
+static DECOMPILE_STATE state = BYTE1;
+
+static int alpha_count;
+static SEEK_STATE seek_state = SEEK_BYTE1;
+
+void decompile_init(void)
+{
+	end = 0;
+	line = 1;
+	numeric = 0;
+	state = BYTE1;
+	seek_state = SEEK_BYTE1;
+}
 
 int decompile(unsigned char *out_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
@@ -35,13 +68,6 @@ int decompile(unsigned char *out_buffer, int out_size,
 	int produced = 0;
 	int i, j, n, m;
 	unsigned char c, *inp, *outp;
-	static int end = 0;
-	static int count;
-	static int line = 1;
-	static int numeric = 0;
-	static int synth_flag;
-	static int synth_count;
-	static DECOMPILE_STATE state = BYTE1;
 
 	inp = *pin_buffer;
 	outp = out_buffer;
@@ -51,7 +77,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			c = *inp;
 			if (c >= 0x10 && c <= 0x1C) {
 				i = c - 1;
-				n = strlen(single01_1C[i]);
+				n = strlen((char *)single01_1C[i]);
 				j = produced + n;
 				if (line_numbers && !numeric) {
 					if (line > 999)
@@ -64,13 +90,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers && !numeric) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -94,7 +120,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c >= 0x01 && c <= 0x0F) {
 					i = c - 1;
-					n = strlen(single01_1C[i]);
+					n = strlen((char *)single01_1C[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -107,13 +133,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -127,7 +153,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					}
 				}
 				else if (c == 0x1D) {
-					n = strlen(prefixGTO);
+					n = strlen((char *)prefixGTO);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -140,13 +166,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -163,7 +189,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					}
 				}
 				else if (c == 0x1E) {
-					n = strlen(prefixXEQ);
+					n = strlen((char *)prefixXEQ);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -176,13 +202,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -199,7 +225,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					}
 				}
 				else if (c == 0x1F) {
-					n = strlen(prefixW);
+					n = strlen((char *)prefixW);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -212,13 +238,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -236,7 +262,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c >= 0x20 && c <= 0x8F) {
 					i = c - 0x20;
-					n = strlen(single20_8F[i]);
+					n = strlen((char *)single20_8F[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -249,13 +275,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -270,7 +296,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c >= 0x90 && c <= 0x9F) {
 					i = c - 0x90;
-					n = strlen(prefix90_9F[i]);
+					n = strlen((char *)prefix90_9F[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -283,13 +309,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -310,7 +336,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c >= 0xA8 && c <= 0xAD) {
 					i = c - 0xA8;
-					n = strlen(prefixA8_AD[i]);
+					n = strlen((char *)prefixA8_AD[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -323,13 +349,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -361,7 +387,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c >= 0xB1 && c <= 0xBF) {
 					i = c - 0xB1;
-					n = strlen(prefixB1_BF[i]);
+					n = strlen((char *)prefixB1_BF[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -374,13 +400,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -403,7 +429,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 				else if (c == 0xCE || c == 0xCF) {
 					i = c - 0xCE;
-					n = strlen(prefixCE_CF[i]);
+					n = strlen((char *)prefixCE_CF[i]);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -416,13 +442,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -436,7 +462,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					}
 				}
 				else if (c >= 0xD0 && c <= 0xDF) {
-					n = strlen(prefixGTO);
+					n = strlen((char *)prefixGTO);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -449,13 +475,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -469,7 +495,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					}
 				}
 				else if (c >= 0xE0 && c <= 0xEF) {
-					n = strlen(prefixXEQ);
+					n = strlen((char *)prefixXEQ);
 					j = produced + n;
 					if (line_numbers) {
 						if (line > 999)
@@ -482,13 +508,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						if (line_numbers) {
 							if (line > 99)
-								sprintf(buffer6, "%d ", line);
+								sprintf((char *)buffer6, "%d ", line);
 							else
-								sprintf(buffer6, " %02d ", line);
+								sprintf((char *)buffer6, " %02d ", line);
 							++line;
 							if (line > 1999)
 								line = 1;
-							j = strlen(buffer6);
+							j = strlen((char *)buffer6);
 							memcpy(outp, buffer6, j);
 							outp += j;
 							produced += j;
@@ -516,7 +542,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 		case BYTE2_IND_NOP:
 			c = *inp;
 			if (c < 0x80) {
-				n = strlen(prefixGTO_IND_NOP);
+				n = strlen((char *)prefixGTO_IND_NOP);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -529,13 +555,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -552,7 +578,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 			}
 			else {
-				n = strlen(prefixXEQ_IND_NOP);
+				n = strlen((char *)prefixXEQ_IND_NOP);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -565,13 +591,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -591,7 +617,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 		case BYTE2_NOP:
 			c = *inp;
-			n = strlen(prefixGTO_NOP);
+			n = strlen((char *)prefixGTO_NOP);
 			j = produced + n;
 			if (line_numbers) {
 				if (line > 999)
@@ -604,13 +630,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 			else {
 				if (line_numbers) {
 					if (line > 99)
-						sprintf(buffer6, "%d ", line);
+						sprintf((char *)buffer6, "%d ", line);
 					else
-						sprintf(buffer6, " %02d ", line);
+						sprintf((char *)buffer6, " %02d ", line);
 					++line;
 					if (line > 1999)
 						line = 1;
-					j = strlen(buffer6);
+					j = strlen((char *)buffer6);
 					memcpy(outp, buffer6, j);
 					outp += j;
 					produced += j;
@@ -640,7 +666,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			if (do_xrom23 && m == 23 &&
 				((i >= 1 && i <= 7) || (i >= 9 && i <= 17) ||
 				(i >= 19 && i <= 52) || (i >= 54 && i <= 62))) {
-				n = strlen(xrom23[i]);
+				n = strlen((char *)xrom23[i]);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -653,13 +679,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -674,7 +700,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			}
 			else if (do_xrom25 && m == 25 &&
 				((i >= 1 && i <= 47) || (i >= 49 && i <= 62))) {
-				n = strlen(xrom25[i]);
+				n = strlen((char *)xrom25[i]);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -687,13 +713,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -708,7 +734,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			}
 			else if (do_xrom26 && m == 26 &&
 				((i >= 1 && i <= 29) || (i >= 31 && i <= 35))) {
-				n = strlen(xrom26[i]);
+				n = strlen((char *)xrom26[i]);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -721,13 +747,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -743,7 +769,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			else if (do_xrom28 && m == 28 &&
 				((i >= 1 && i <= 2) || (i >= 4 && i <= 24) ||
 				(i >= 27 && i <= 41))) {
-				n = strlen(xrom28[i]);
+				n = strlen((char *)xrom28[i]);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -756,13 +782,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -776,7 +802,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 			}
 			else {
-				n = strlen(prefixXROM);
+				n = strlen((char *)prefixXROM);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -787,19 +813,19 @@ int decompile(unsigned char *out_buffer, int out_size,
 				if (j > out_size)
 					done = 1;
 				else {
-					sprintf(buffer6, "%02d", m);
+					sprintf((char *)buffer6, "%02d", m);
 					memcpy(&prefixXROM[5], buffer6, 2);
-					sprintf(buffer6, "%02d", i);
+					sprintf((char *)buffer6, "%02d", i);
 					memcpy(&prefixXROM[8], buffer6, 2);
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -818,8 +844,8 @@ int decompile(unsigned char *out_buffer, int out_size,
 			c = *inp;
 			if (c < 0x80) {
 				i = c;
-				n = strlen(prefixGTO_IND);
-				m = strlen(postfix00_7F[i]);
+				n = strlen((char *)prefixGTO_IND);
+				m = strlen((char *)postfix00_7F[i]);
 				j = produced + n + m;
 				if (line_numbers) {
 					if (line > 999)
@@ -832,13 +858,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -855,8 +881,8 @@ int decompile(unsigned char *out_buffer, int out_size,
 			}
 			else {
 				i = c & 0x7F;
-				n = strlen(prefixXEQ_IND);
-				m = strlen(postfix00_7F[i]);
+				n = strlen((char *)prefixXEQ_IND);
+				m = strlen((char *)postfix00_7F[i]);
 				j = produced + n + m;
 				if (line_numbers) {
 					if (line > 999)
@@ -869,13 +895,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -895,7 +921,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 		case BYTE2_POSTFIX:
 			i = *inp;
 			if (i < 0x80) {
-				n = strlen(postfix00_7F[i]);
+				n = strlen((char *)postfix00_7F[i]);
 				j = produced + n;
 				if (j > out_size)
 					done = 1;
@@ -910,8 +936,8 @@ int decompile(unsigned char *out_buffer, int out_size,
 			}
 			else {
 				i &= 0x7F;
-				n = strlen(postfixIND);
-				m = strlen(postfix00_7F[i]);
+				n = strlen((char *)postfixIND);
+				m = strlen((char *)postfix00_7F[i]);
 				j = produced + n + m;
 				if (j > out_size)
 					done = 1;
@@ -936,7 +962,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 		case BYTE3_POSTFIX:
 			i = (*inp) & 0x7F;
-			n = strlen(postfix00_7F[i]);
+			n = strlen((char *)postfix00_7F[i]);
 			j = produced + n;
 			if (j > out_size)
 				done = 1;
@@ -961,7 +987,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 		case BYTE3_GLOBAL:
 			c = *inp;
 			if (c < 0xF0) {
-				n = strlen(prefixEND);
+				n = strlen((char *)prefixEND);
 				j = produced + n;
 				if (line_numbers) {
 					if (line > 999)
@@ -974,13 +1000,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -995,7 +1021,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				}
 			}
 			else {
-				n = strlen(prefixLBL);
+				n = strlen((char *)prefixLBL);
 				j = produced + n + 1;
 				if (line_numbers) {
 					if (line > 999)
@@ -1008,13 +1034,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					if (line_numbers) {
 						if (line > 99)
-							sprintf(buffer6, "%d ", line);
+							sprintf((char *)buffer6, "%d ", line);
 						else
-							sprintf(buffer6, " %02d ", line);
+							sprintf((char *)buffer6, " %02d ", line);
 						++line;
 						if (line > 1999)
 							line = 1;
-						j = strlen(buffer6);
+						j = strlen((char *)buffer6);
 						memcpy(outp, buffer6, j);
 						outp += j;
 						produced += j;
@@ -1085,13 +1111,13 @@ int decompile(unsigned char *out_buffer, int out_size,
 			else {
 				if (line_numbers) {
 					if (line > 99)
-						sprintf(buffer6, "%d ", line);
+						sprintf((char *)buffer6, "%d ", line);
 					else
-						sprintf(buffer6, " %02d ", line);
+						sprintf((char *)buffer6, " %02d ", line);
 					++line;
 					if (line > 1999)
 						line = 1;
-					j = strlen(buffer6);
+					j = strlen((char *)buffer6);
 					memcpy(outp, buffer6, j);
 					outp += j;
 					produced += j;
@@ -1103,7 +1129,9 @@ int decompile(unsigned char *out_buffer, int out_size,
 					if (c == 0x7F) {
 						if (text_append) {
 							*outp++ = '\"';
-							*outp++ = 0xC3;
+							*outp++ = '|';
+							*outp++ = '-';
+							++produced;
 						}
 						else {
 							*outp++ = '>';
@@ -1113,15 +1141,12 @@ int decompile(unsigned char *out_buffer, int out_size,
 					else {
 						*outp++ = '\"';
 						if (is_nodisplay(c)) {
-#if DO_ESC
 							*outp++ = '\\';
-							sprintf(buffer6, "%02X", c);
+							*outp++ = 'x';
+							sprintf((char *)buffer6, "%02X", c);
 							memcpy(outp, buffer6, 2);
 							outp += 2;
-							produced += 2;
-#else
-							*outp++ = 0x04;
-#endif
+							produced += 3;
 							synth_flag = 1;
 						}
 						else {
@@ -1149,15 +1174,12 @@ int decompile(unsigned char *out_buffer, int out_size,
 			c = *inp++;
 			++consumed;
 			if (is_nodisplay(c)) {
-#if DO_ESC
 				*outp++ = '\\';
-				sprintf(buffer6, "%02X", c);
+				*outp++ = 'x';
+				sprintf((char *)buffer6, "%02X", c);
 				memcpy(outp, buffer6, 2);
 				outp += 2;
-				produced += 2;
-#else
-				*outp++ = 0x04;
-#endif
+				produced += 3;
 				synth_flag = 1;
 			}
 			else {
@@ -1187,14 +1209,14 @@ int decompile(unsigned char *out_buffer, int out_size,
 			if (j > out_size)
 				done = 1;
 			else {
-				// "text"
+				/* "text" */
 				if (synth_buffer[0] > 0xF0 && synth_count > 1)
 					i = 1;
-				// GTO/XEQ/W "alpha"
+				/* GTO/XEQ/W "alpha" */
 				else if (synth_buffer[0] >= 0x1D && synth_buffer[0] <= 0x1F &&
 					synth_buffer[1] > 0xF0 && synth_count > 2)
 					i = 2;
-				// LBL "alpha"
+				/* LBL "alpha" */
 				else if (synth_buffer[0] >= 0xC0 && synth_buffer[0] <= 0xCD &&
 					synth_buffer[2] > 0xF1 && synth_count > 4)
 					i = 4;
@@ -1217,16 +1239,8 @@ int decompile(unsigned char *out_buffer, int out_size,
 							++produced;
 						}
 						else {
-#if DO_ESC
 							*outp++ = 0x04;
 							++produced;
-#else
-							*outp++ = '\\';
-							sprintf(buffer6, "%02X", c);
-							memcpy(outp, buffer6, 2);
-							outp += 2;
-							produced += 3;
-#endif
 						}
 					} while (--synth_count);
 					*outp++ = '\"';
@@ -1241,7 +1255,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else {
 					do {
 						c = synth_buffer[i++];
-						sprintf(buffer6, "%02X", c);
+						sprintf((char *)buffer6, "%02X", c);
 						memcpy(outp, buffer6, 2);
 						outp += 2;
 						produced += 2;
@@ -1288,7 +1302,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			break;
 		}
 
-		// exhausted buffers?
+		/* exhausted buffers? */
 		if (produced == out_size ||
 			(consumed == *pin_count &&
 			state != CLOSE_QUOTE &&
@@ -1301,7 +1315,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 	} while (!done);
 
-	// output pending?
+	/* output pending? */
 	*ppending = state == CLOSE_QUOTE ||
 		state == APPEND_SYNTH ||
 		state == APPEND_KEY ||
@@ -1330,22 +1344,22 @@ int room_for_key(unsigned char *buffer, int count)
 	if (buffer[0] >= 0xC0 && buffer[0] <= 0xCD &&
 		buffer[2] > 0xF1 && buffer[3] && count > 4) {
 		row = buffer[3] & 0x0F;
-		return((row > 0 && row < 9) ? strlen(pKey) : strlen(psKey));
+		return((row > 0 && row < 9) ? strlen((char *)pKey) : strlen((char *)psKey));
 	}
 
 	return(0);
 }
 
-void copy_key(char *buffer, char code)
+void copy_key(unsigned char *buffer, unsigned char code)
 {
-	char row, col;
+	unsigned char row, col;
 
 	row = code & 0x0F;
 	if (row > 0 && row < 9) {
 		col = (code >> 4) + 1;
 		pKey[6] = row + '0';
 		pKey[7] = col + '0';
-		memcpy(buffer, pKey, strlen(pKey));
+		memcpy(buffer, pKey, strlen((char *)pKey));
 	}
 	else {
 		code -= 8;
@@ -1353,7 +1367,89 @@ void copy_key(char *buffer, char code)
 		col = (code >> 4) + 1;
 		psKey[7] = row + '0';
 		psKey[8] = col + '0';
-		memcpy(buffer, psKey, strlen(psKey));
+		memcpy(buffer, psKey, strlen((char *)psKey));
 	}
 }
 
+int seek_end(unsigned char *buffer, int count)
+{
+	unsigned char c;
+	int end = 0;
+	int i = 0;
+
+	while (count && !end) {
+		--count;
+		c = buffer[i++];
+		switch (seek_state) {
+		case SEEK_BYTE1:
+			if (c >= 0x1D && c <= 0x1F) {
+				seek_state = SEEK_BYTE2_ALPHA;
+			}
+			else if ((c >= 0x90 && c <= 0xBF) ||
+				(c >= 0xCE && c <= 0xCF)) {
+				seek_state = SEEK_BYTE2_OF_2;
+			}
+			else if (c >= 0xC0 && c <= 0xCD) {
+				seek_state = SEEK_BYTE2_GLOBAL;
+			}
+			else if (c >= 0xD0 && c <= 0xEF) {
+				seek_state = SEEK_BYTE2_OF_3;
+			}
+			else if (c >= 0xF0 && c <= 0xFF) {
+				alpha_count = c & 0x0F;
+				if (alpha_count)
+					seek_state = SEEK_BYTE_ALPHA;
+			}
+			break;
+
+		case SEEK_BYTE2_OF_2:
+			seek_state = SEEK_BYTE1;
+			break;
+
+		case SEEK_BYTE2_OF_3:
+			seek_state = SEEK_BYTE3_OF_3;
+			break;
+
+		case SEEK_BYTE3_OF_3:
+			seek_state = SEEK_BYTE1;
+			break;
+
+		case SEEK_BYTE2_GLOBAL:
+			seek_state = SEEK_BYTE3_GLOBAL;
+			break;
+
+		case SEEK_BYTE3_GLOBAL:
+			if (c < 0xF0) {
+				end = i;
+				seek_state = SEEK_BYTE1;
+			}
+			else {
+				alpha_count = c & 0x0F;
+				seek_state = alpha_count ? SEEK_BYTE4_GLOBAL : SEEK_BYTE1;
+			}
+			break;
+
+		case SEEK_BYTE4_GLOBAL:
+			--alpha_count;
+			seek_state = alpha_count ? SEEK_BYTE_ALPHA : SEEK_BYTE1;
+			break;
+
+		case SEEK_BYTE2_ALPHA:
+			if (c <= 0xF0)
+				seek_state = SEEK_BYTE1;
+			else {
+				alpha_count = c & 0x0F;
+				seek_state = SEEK_BYTE_ALPHA;
+			}
+			break;
+
+		case SEEK_BYTE_ALPHA:
+			--alpha_count;
+			if (alpha_count == 0)
+				seek_state = SEEK_BYTE1;
+			break;
+		}
+	}
+
+	return(end);
+}

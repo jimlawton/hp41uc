@@ -1,29 +1,31 @@
 /*
-HP41UC.EXE
+HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
-Build environment: Microsoft Visual Studio 32-bit compiler.
+Build environment: Microsoft Visual Studio or GNU C compiler.
 */
 
 /*
-This file is part of HP41UC.EXE.
+This file is part of HP41UC.
 
-HP41UC.EXE is free software: you can redistribute it and/or modify
+HP41UC is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-HP41UC.EXE is distributed in the hope that it will be useful,
+HP41UC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
+along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// globals
+/* globals for the project */
+PRINTER_TYPE bc_printer = PRINTER_NONE;
+
 char inpath[_MAX_PATH];
 char outpath[_MAX_PATH];
 char dirpath[_MAX_PATH];
@@ -49,45 +51,45 @@ unsigned char buf2_256[256];
 unsigned char buf_512[512];
 unsigned char buf_1024[1024];
 
-// output descriptors
+/* output descriptors */
 FILE_DESC bin = {
 	FILE_BIN,
 	2,
-	".BIN",
+	".bin",
 	"bin",
 };
 FILE_DESC dat = {
 	FILE_DAT,
 	4,
-	".DAT",
+	".dat",
 	"dat",
 };
 FILE_DESC lif = {
 	FILE_LIF,
 	768,
-	".LIF",
+	".lif",
 	"lif",
 };
 FILE_DESC p41 = {
 	FILE_P41,
 	32,
-	".P41",
+	".p41",
 	"p41",
 };
 FILE_DESC raw = {
 	FILE_RAW,
 	0,
-	".RAW",
+	".raw",
 	"raw",
 };
 FILE_DESC txt = {
 	FILE_TXT,
 	0,
-	".TXT",
+	".txt",
 	"txt",
 };
 
-// 32-byte LIF header
+/* 32-byte LIF header */
 unsigned char lifhdr[32] = {
 	0x80, 0x00, 0x00, 0x00, 0x02, 0x10, 0x00, 0x80,
 	0x00, 0x00, 0x00, 0x02, 0x10, 0x00, 0x00, 0x00,
@@ -95,7 +97,7 @@ unsigned char lifhdr[32] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-// 32-byte LIF directory
+/* 32-byte LIF directory */
 unsigned char lifdir[32] = {
 	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 	0x20, 0x20, 0xE0, 0x80, 0x00, 0x00, 0x00, 0x00,

@@ -1,39 +1,44 @@
 /*
-HP41UC.EXE
+HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
-Build environment: Microsoft Visual Studio 32-bit compiler.
+Build environment: Microsoft Visual Studio or GNU C compiler.
 */
 
 /*
-This file is part of HP41UC.EXE.
+This file is part of HP41UC.
 
-HP41UC.EXE is free software: you can redistribute it and/or modify
+HP41UC is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-HP41UC.EXE is distributed in the hope that it will be useful,
+HP41UC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
+along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "hp41uc.h"
 #include "barcode.h"
 
-// globals
-PRINTER_TYPE bc_printer = PRINTER_NONE;
-char *bc_title = NULL;
-int ps_pages = 1;
-long ps_page_pos[PS_MAX_PAGES];
-float ps_top = (float)PS_TOP_MARGIN;
-char pcl_left_margin[] = "    ";  // 4 spaces
-char pcl_row_margin[] = "      ";  // 6 spaces
+static char *bc_title = NULL;
+static int ps_pages = 1;
+static float ps_top = (float)PS_TOP_MARGIN;
+static long ps_page_pos[PS_MAX_PAGES];
+static char pcl_left_margin[] = "    ";	  /* 4 spaces */
+static char pcl_row_margin[] = "      ";  /* 6 spaces */
+
+void barcode_init(void)
+{
+	bc_title = NULL;
+	ps_pages = 1;
+	ps_top = (float)PS_TOP_MARGIN;
+}
 
 void barcode(char *infile, char *outfile, char *title)
 {
@@ -45,8 +50,7 @@ void barcode(char *infile, char *outfile, char *title)
 	long outlength = 0;
 	FILE *fin = NULL;
 	FILE *fout = NULL;
-	struct _finddata_t rawfile;
-	intptr_t hFind = -1L;
+	FIND_FILE rawfile;
 	unsigned char *in_buffer, *out_buffer;
 	int in_count, out_count, out_size;
 	int start_line, end_line;
@@ -58,42 +62,41 @@ void barcode(char *infile, char *outfile, char *title)
 	int row = 1;
 	DECODE_FLAG flag;
 
-	// init strings
+	/* init strings */
 	bc_title = title;
 	get_bc_ext(ext);
 
-	// get input and output paths
-	if (getiopath(infile, ".RAW", &rawfile, &hFind, 1, dirpath,
+	/* get input and output paths */
+	if (getiopath(infile, ".raw", &rawfile, 1, dirpath,
 		outfile, ext, outpath) == 0) {
-		if (hFind != -1L)
-			_findclose(hFind);
+		findfile_close(&rawfile);
 		return;
 	}
 
-	// set input path
+	/* set input path */
 	getfullpath(inpath, dirpath, rawfile.name);
 
-	// set input length
+	/* set input length */
 	inlength = rawfile.size;
 
-	// open input file
+	/* open input file */
 	if ((fin = open_input(inpath, inlength, infile, outpath))) {
-		// open output file
+		/* open output file */
 		if ((fout = open_output(outpath))) {
-			// show banner
+			/* show banner */
 			get_bc_type(ascii);
 			printf("Barcode[ %s ]:  [ %s ] => [ %s ]\n", ascii, inpath, outpath);
 
 			if (bc_printer == PRINTER_POSTCRIPT) {
-				// postcript prolog
+				/* postcript prolog */
 				fprintf(fout, "%%!PS-Adobe-2.0\r\n");
-				fprintf(fout, "%%%%Creator: \"HP41UC.EXE\", HP-41 Barcode Generator by Leo Duran.\r\n");
+				fprintf(fout, "%%%%Creator: \"HP41UC\", HP-41 Barcode Generator by Leo Duran.\r\n");
 				fprintf(fout, "%%%%DocumentPaperSizes: letter\r\n");
 				fprintf(fout, "%%%%Pages: (atend)\r\n");
 				fprintf(fout, "%%%%PageOrder: Ascend\r\n");
 				fprintf(fout, "%%%%EndComments\r\n\r\n");
 
-				// postcript variables
+				/* postcript variables */
 				fprintf(fout, "%%%%BeginProlog\r\n");
 				fprintf(fout, "/ps_punit %.2f def\r\n", PS_PEN_UNIT);
 				fprintf(fout, "/ps_height %.2f def\r\n", PS_BAR_HEIGHT);
@@ -102,7 +105,7 @@ void barcode(char *infile, char *outfile, char *title)
 				fprintf(fout, "/ps_one_bits %d def\r\n", PS_ONE_BITS);
 				fprintf(fout, "/ps_one_pen %d def\r\n", PS_ONE_PEN);
 
-				// postcript procedure: ps_putbar
+				/* postcript procedure: ps_putbar */
 				fprintf(fout, "\r\n/ps_putbar {\r\n");
 				fprintf(fout, "  dup ps_bits add ps_punit mul 2 div ps_center add\r\n");
 				fprintf(fout, "  /ps_center exch def\r\n");
@@ -112,7 +115,7 @@ void barcode(char *infile, char *outfile, char *title)
 				fprintf(fout, "  0 ps_height rlineto stroke\r\n");
 				fprintf(fout, "} bind def\r\n");
 
-				// postcript procedure: ps_putbyte
+				/* postcript procedure: ps_putbyte */
 				fprintf(fout, "\r\n/ps_putbyte {\r\n");
 				fprintf(fout, "  /ps_byte exch def\r\n");
 				fprintf(fout, "  /ps_mask 128 def\r\n");
@@ -125,7 +128,7 @@ void barcode(char *infile, char *outfile, char *title)
 				fprintf(fout, "  } repeat\r\n");
 				fprintf(fout, "} bind def\r\n");
 
-				// postcript procedure: ps_putrow
+				/* postcript procedure: ps_putrow */
 				fprintf(fout, "\r\n/ps_putrow {\r\n");
 				fprintf(fout, "  /ps_bytes exch def\r\n");
 				fprintf(fout, "  /ps_center %.2f def\r\n", PS_CENTER);
@@ -140,24 +143,24 @@ void barcode(char *infile, char *outfile, char *title)
 				fprintf(fout, "} bind def\r\n");
 				fprintf(fout, "%%%%EndProlog\r\n\r\n");
 
-				// first page
+				/* first page */
 				fprintf(fout, "gsave\r\n");
 				fflush(fout);
-				ps_page_pos[0] = _filelength(_fileno(fout)) + 2;
+				ps_page_pos[0] = get_filelength(_fileno(fout)) + 2;
 				fprintf(fout, "%%%%Page:      \r\n");
 			}
 			else if (bc_printer == PRINTER_HP) {
-				// normal text pitch at 12cpi, 80cpl
+				/* normal text pitch at 12cpi, 80cpl */
 				fprintf(fout, "\x1B&k0S");
 
-				// line spacing at 8 lines/inch
+				/* line spacing at 8 lines/inch */
 				fprintf(fout, "\x1B&l8D");
 
-				// horizontal print region at 640 dots( 96 dots/inch )
+				/* horizontal print region at 640 dots( 96 dots/inch ) */
 				fprintf(fout, "\x1B*r640S");
 			}
 
-			// "Title"
+			/* "Title" */
 			if (bc_printer == PRINTER_POSTCRIPT) {
 				if (bc_title && *bc_title != '\0') {
 					fprintf(fout, "/Helvetica findfont 14 scalefont setfont\r\n");
@@ -165,60 +168,60 @@ void barcode(char *infile, char *outfile, char *title)
 						PS_LEFT_MARGIN, ps_top, bc_title);
 				}
 
-				// skip a row
+				/* skip a row */
 				ps_top -= (float)PS_ROW_HEIGHT;
 			}
 			else if (bc_printer == PRINTER_HP) {
-				// title in bold
+				/* title in bold */
 				if (bc_title && *bc_title != '\0') {
 					fprintf(fout, "%s\x1B(s1B%s\x1B(s0B",
 						pcl_left_margin, bc_title);
 				}
 				fprintf(fout, "\r\n\r\n");
 			}
-			else { // PRINTER_NONE
+			else { /* PRINTER_NONE */
 				if (bc_title && *bc_title != '\0') {
 					fprintf(fout, "%s\r\n", bc_title);
 				}
 				fprintf(fout, "\r\n");
 			}
 
-			// "Registers Needed:"
+			/* "Registers Needed:" */
 			if (bc_printer == PRINTER_POSTCRIPT) {
 				fprintf(fout, "/Helvetica findfont 12 scalefont setfont\r\n");
 				fprintf(fout, "%.2f %.2f moveto (", PS_LEFT_MARGIN, ps_top);
 
 				fflush(fout);
-				prog_pos = _filelength(_fileno(fout));
+				prog_pos = get_filelength(_fileno(fout));
 				fprintf(fout, "Program Registers Needed:     ) show\r\n");
 
-				// set font for rows
+				/* set font for rows */
 				fprintf(fout, "/Helvetica findfont 8 scalefont setfont\r\n");
 
-				// skip a row
+				/* skip a row */
 				ps_top -= (float)PS_ROW_HEIGHT;
 			}
 			else if (bc_printer == PRINTER_HP) {
 				fflush(fout);
-				prog_pos = _filelength(_fileno(fout));
+				prog_pos = get_filelength(_fileno(fout));
 				fprintf(fout, "%sProgram Registers Needed:     \r\n\r\n",
 					pcl_left_margin);
 
-				// compressed text pitch at 21.3cpi, 142cpl ( for rows )
+				/* compressed text pitch at 21.3cpi, 142cpl ( for rows ) */
 				fprintf(fout, "\x1B&k2S");
 			}
-			else { // PRINTER_NONE
+			else { /* PRINTER_NONE */
 				fflush(fout);
-				prog_pos = _filelength(_fileno(fout));
+				prog_pos = get_filelength(_fileno(fout));
 				fprintf(fout, "Program Registers Needed:     \r\n\r\n");
 			}
 
-			// program length in blocks
+			/* program length in blocks */
 			blk = inlength / 256;
 			if (blk * 256 < inlength)
 				++blk;
 
-			// write program blocks
+			/* write program blocks */
 			checksum = 0;
 			flag = DECODE_FLAG_NONE;
 			for (i = 0, j = sizeof(buf1_256); i < blk && j && inlength; ++i) {
@@ -226,7 +229,7 @@ void barcode(char *infile, char *outfile, char *title)
 					j = (int)inlength;
 				if (fread(buf1_256, 1, j, fin) != (size_t)j) {
 					j = 0;
-					printf("Error reading from: %s\n", inpath);
+					printf("Error reading from[ %s ]\n", inpath);
 				}
 				else {
 					inlength -= j;
@@ -247,35 +250,35 @@ void barcode(char *infile, char *outfile, char *title)
 							&flag);
 
 						if (flag != DECODE_FLAG_PENDING || inlength == 0) {
-							// update checksum
+							/* update checksum */
 							for (k = 0; k < out_count; ++k)
 								checksum = checksum8(checksum, buf1_16[k + 3]);
 
-							// init 3-byte header
+							/* init 3-byte header */
 							buf1_16[2] = 0;
 							buf1_16[1] = ((row - 1) & 0x0F) + 0x10;
 							checksum = checksum8(checksum, buf1_16[1]);
 							buf1_16[0] = checksum;
 
 							if (lead_count) {
-								// adjust current row
+								/* adjust current row */
 								checksum = checksum8(checksum, previous_trail_count);
 								buf1_16[2] = lead_count << 4;
 								checksum = checksum8(checksum, buf1_16[2]);
 								buf1_16[0] = checksum;
 
-								// adjust previous row
+								/* adjust previous row */
 								buf2_16[2] += previous_trail_count;
 								buf2_16[0] = checksum8(buf2_16[0], previous_trail_count);
 
-								// print previous row (adjusted)
+								/* print previous row (adjusted) */
 								printbc(row - 1,
 									previous_start_line,
 									previous_end_line,
 									buf2_16, 16, fout);
 							}
 							else if (previous_trail_count) {
-								// print previous row (non-adjusted)
+								/* print previous row (non-adjusted) */
 								printbc(row - 1,
 									previous_start_line,
 									previous_end_line,
@@ -283,14 +286,14 @@ void barcode(char *infile, char *outfile, char *title)
 							}
 
 							if (trail_count) {
-								// save current row (wait for next row)
+								/* save current row (wait for next row) */
 								memcpy(buf2_16, buf1_16, 16);
 								previous_trail_count = trail_count;
 								previous_start_line = start_line;
 								previous_end_line = end_line;
 							}
 							else {
-								// print current row
+								/* print current row */
 								previous_trail_count = 0;
 								printbc(row, start_line, end_line,
 									buf1_16, out_count + 3, fout);
@@ -307,7 +310,7 @@ void barcode(char *infile, char *outfile, char *title)
 			}
 
 			if (outlength) {
-				// form-feed on last page
+				/* form-feed on last page */
 				if (bc_printer == PRINTER_POSTCRIPT) {
 					fprintf(fout, "showpage\r\n");
 					fprintf(fout, "%%%%PageTrailer\r\n");
@@ -320,13 +323,13 @@ void barcode(char *infile, char *outfile, char *title)
 					fprintf(fout, "\f");
 				}
 
-				// how many 7-byte registers?
+				/* how many 7-byte registers? */
 				reg = outlength / 7;
 				if (reg * 7 < outlength) {
 					++reg;
 				}
 
-				// go back and edit #registers
+				/* go back and edit #registers */
 				fseek(fout, prog_pos, SEEK_SET);
 				if (bc_printer == PRINTER_POSTCRIPT) {
 					fprintf(fout, "Program Registers Needed: %ld", reg);
@@ -335,11 +338,11 @@ void barcode(char *infile, char *outfile, char *title)
 					fprintf(fout, "%sProgram Registers Needed: %ld",
 						pcl_left_margin, reg);
 				}
-				else { // PRINTER_NONE
+				else { /* PRINTER_NONE */
 					fprintf(fout, "Program Registers Needed: %ld", reg);
 				}
 
-				// go back and edit page#
+				/* go back and edit page# */
 				if (bc_printer == PRINTER_POSTCRIPT) {
 					for (i = 0; i < ps_pages; ++i) {
 						fseek(fout, ps_page_pos[i], SEEK_SET);
@@ -347,7 +350,7 @@ void barcode(char *infile, char *outfile, char *title)
 					}
 				}
 
-				printf(" Program Size[ %04X ]  ( %ld bytes )\n",
+				printf(" Program Size[ %04lX ]  ( %ld bytes )\n",
 					outlength, outlength);
 				printf(" Program Registers Needed: %ld\n", reg);
 			}
@@ -357,11 +360,10 @@ void barcode(char *infile, char *outfile, char *title)
 	if (fout) {
 		fflush(fout);
 		if (outlength)
-			outlength = _filelength(_fileno(fout));
+			outlength = get_filelength(_fileno(fout));
 	}
 
-	if (hFind != -1L)
-		_findclose(hFind);
+	findfile_close(&rawfile);
 	closefiles(fin, fout, outlength, 0);
 }
 
@@ -376,33 +378,33 @@ void printbc(int row, int start_line, int end_line,
 	static int rows_in_page = 1;
 
 	if (bc_printer == PRINTER_POSTCRIPT) {
-		// need form-feed?
+		/* need form-feed? */
 		if (ps_top < PS_BOTTOM_MARGIN) {
-			// next page
+			/* next page */
 			fprintf(fout, "showpage\r\n");
 			fprintf(fout, "%%%%PageTrailer\r\n\r\n");
 			fflush(fout);
-			ps_page_pos[ps_pages++] = _filelength(_fileno(fout)) + 2;
+			ps_page_pos[ps_pages++] = get_filelength(_fileno(fout)) + 2;
 			fprintf(fout, "%%%%Page:        \r\n");
 
-			// reset TOP margin
+			/* reset TOP margin */
 			ps_top = (float)PS_TOP_MARGIN;
 
-			// "Title"
+			/* "Title" */
 			if (bc_title && *bc_title != '\0') {
 				fprintf(fout, "/Helvetica findfont 14 scalefont setfont\r\n");
 				fprintf(fout, "%.2f %.2f moveto (%s) show\r\n",
 					PS_LEFT_MARGIN, ps_top, bc_title);
 			}
 
-			// skip a row
+			/* skip a row */
 			ps_top -= (float)PS_ROW_HEIGHT;
 
-			// reset font for rows
+			/* reset font for rows */
 			fprintf(fout, "/Helvetica findfont 8 scalefont setfont\r\n");
 		}
 
-		// print row number
+		/* print row number */
 		if (end_line > start_line) {
 			fprintf(fout, "%.2f %.2f moveto (Row %d (%d - %d)) show\r\n",
 				PS_LEFT_MARGIN, ps_top,
@@ -414,7 +416,7 @@ void printbc(int row, int start_line, int end_line,
 				row, start_line);
 		}
 
-		// print row bars
+		/* print row bars */
 		ps_top -= (float)PS_START_ROW;
 		fprintf(fout, "/ps_top %.2f def\r\n", ps_top);
 
@@ -426,26 +428,26 @@ void printbc(int row, int start_line, int end_line,
 		sprintf(&ascii[strlen(ascii)], " %d ps_putrow\r\n", count);
 		fwrite(ascii, 1, strlen(ascii), fout);
 
-		// update TOP margin
+		/* update TOP margin */
 		ps_top -= (float)PS_NEXT_ROW;
 	}
 	else if (bc_printer == PRINTER_HP) {
-		// new page?
+		/* new page? */
 		if (rows_in_page == 20) {
-			// next page
+			/* next page */
 			rows_in_page = 0;
 			fprintf(fout, "\f");
 
-			// "Title"
+			/* "Title" */
 			if (bc_title && *bc_title != '\0') {
-				// normal text pitch at 12cpi, 80cpl
+				/* normal text pitch at 12cpi, 80cpl */
 				fprintf(fout, "\x1B&k0S");
 
-				// title in bold
+				/* title in bold */
 				fprintf(fout, "%s\x1B(s1B%s\x1B(s0B",
 					pcl_left_margin, bc_title);
 
-				// compressed text pitch at 21.3cpi, 142cpl ( for rows )
+				/* compressed text pitch at 21.3cpi, 142cpl ( for rows ) */
 				fprintf(fout, "\x1B&k2S");
 			}
 			fprintf(fout, "\r\n\r\n");
@@ -460,11 +462,11 @@ void printbc(int row, int start_line, int end_line,
 				pcl_row_margin, row, start_line);
 		}
 
-		// init loop variables
+		/* init loop variables */
 		pc = buf2_256;
 		bytes = bit = 0;
 
-		// init rater fonts
+		/* init rater fonts */
 		one.bitmap = 0x07;
 		one.bits = 5;
 		zero.bitmap = 0x01;
@@ -472,15 +474,15 @@ void printbc(int row, int start_line, int end_line,
 		blank.bitmap = 0x00;
 		blank.bits = 8;
 
-		// left margin
+		/* left margin */
 		for (i = 1; (size_t)i < strlen(pcl_left_margin); ++i)
 			render(&pc, blank, &bytes, &bit);
 
-		// start bars
+		/* start bars */
 		render(&pc, zero, &bytes, &bit);
 		render(&pc, zero, &bytes, &bit);
 
-		// row bytes
+		/* row bytes */
 		for (i = 0; i < count; ++i) {
 			c = buffer[i];
 			for (j = 0; j < 8; ++j) {
@@ -489,30 +491,30 @@ void printbc(int row, int start_line, int end_line,
 			}
 		}
 
-		// end bars
+		/* end bars */
 		render(&pc, one, &bytes, &bit);
 		render(&pc, zero, &bytes, &bit);
 
-		// start raster graphics
+		/* start raster graphics */
 		fprintf(fout, "\x1B*r0A");
 
-		// move down 2 scan-lines to start raster
+		/* move down 2 scan-lines to start raster */
 		fprintf(fout, "\x1B*b0W\x1B*b0W");
 
-		// repeat raster to set bar height ( close to 0.5in )
+		/* repeat raster to set bar height ( close to 0.5in ) */
 		for (i = 0; i < 24; ++i) {
-			//printer raster line
+			/*printer raster line */
 			fprintf(fout, "\x1B*b%dW", bytes);
 			fwrite(buf2_256, 1, bytes, fout);
 		}
 
-		// end raster graphics
+		/* end raster graphics */
 		fprintf(fout, "\x1B*rB\r\n");
 
-		// update ROW count
+		/* update ROW count */
 		++rows_in_page;
 	}
-	else { // PRINTER_NONE
+	else { /* PRINTER_NONE */
 		if (end_line > start_line) {
 			fprintf(fout, "Row %d (%d - %d)\r\n", row, start_line, end_line);
 		}
@@ -520,7 +522,7 @@ void printbc(int row, int start_line, int end_line,
 			fprintf(fout, "Row %d ( %d )\r\n", row, start_line);
 		}
 
-		i = hextoascii(ascii, buffer, count);
+		i = hextoascii((unsigned char *)ascii, buffer, count);
 		ascii[i++] = 0x0D;
 		ascii[i++] = 0x0A;
 		fwrite(ascii, 1, i, fout);
@@ -549,7 +551,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 	outp = *pout_buffer;
 	flag = *pflag;
 
-	// update start line
+	/* update start line */
 	if (flag != DECODE_FLAG_PENDING) {
 		lead_count = 0;
 		if (line) {
@@ -564,13 +566,13 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 	}
 
 	do {
-		// copy byte
+		/* copy byte */
 		c = *inp++;
 		++consumed;
 		*outp++ = c;
 		++produced;
 
-		// update byte count
+		/* update byte count */
 		if (state != DECODE_BYTE1)
 			++multi_byte;
 
@@ -610,7 +612,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 						state = DECODE_BYTE_ALPHA;
 				}
 
-				// update byte count
+				/* update byte count */
 				if (trail_count) {
 					lead_count = multi_byte - trail_count;
 					trail_count = 0;
@@ -667,7 +669,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 			break;
 		}
 
-		// init byte count
+		/* init byte count */
 		if (state == DECODE_BYTE1 && !numeric && multi_byte) {
 			if (trail_count) {
 				lead_count = multi_byte - trail_count;
@@ -678,7 +680,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 
 	} while (produced < out_size && consumed < *pin_count && flag != DECODE_FLAG_END);
 
-	// update flag
+	/* update flag */
 	if (flag != DECODE_FLAG_END) {
 		if (produced < out_size)
 			flag = DECODE_FLAG_PENDING;
@@ -689,7 +691,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 	}
 	*pflag = flag;
 
-	// update END line
+	/* update END line */
 	*pend_line = line;
 	*ptrail_count = trail_count;
 	*plead_count = lead_count;
@@ -723,7 +725,7 @@ void render(unsigned char **pbuffer, RASTER8 font,
 		src_mask <<= 1;
 	src_bitmap = font.bitmap;
 
-	// walk thru source bits
+	/* walk thru source bits */
 	for (i = 0; i < font.bits; ++i) {
 		if (bit == 0) {
 			++bytes;
@@ -762,11 +764,11 @@ int checksum8(int old_sum, int update)
 void get_bc_ext(char *ext)
 {
 	if (bc_printer == PRINTER_HP)
-		strcpy(ext, ".PCL");
+		strcpy(ext, ".pcl");
 	else if (bc_printer == PRINTER_POSTCRIPT)
-		strcpy(ext, ".PS");
+		strcpy(ext, ".ps");
 	else
-		strcpy(ext, ".WND");
+		strcpy(ext, ".wnd");
 }
 
 void get_bc_type(char *type)

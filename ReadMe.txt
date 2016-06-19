@@ -1,12 +1,12 @@
 HP41UC - User-Code Utility for HP-41 Calculators
-Version 2.00 - June 11, 2016
+Version 2.10 - June 19, 2016
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
-Contributed under: GNU General Public License, Version 3
+Contributed under: GNU General Public License, Version 3.
 
-Build environment: Microsoft Visual Studio 32-bit compiler.
+Build environment: Microsoft Visual Studio or GNU C compiler.
 
-The purpose of this utility is to provide means for editing and archiving code outside of the HP-41(tm) calculator. Of course, this implies that there must be mechanisms to transfer code to and from the calculator, such as file transfers and barcode scanning. To that end, the utility provides the following functions:
+This utility provides means for editing and archiving code outside of the HP-41 calculator, using file transfer and barcode scanning mechanisms. To that end, the utility provides the following functions:
 
 * File Converter *
 The file format converter is used to package compiled code with wrappers compliant with various popular file formats. In some cases that may require preceding the code with a "header", appending a "checksum", or adding "filler" (don't care) bytes to satisfy file size requirements.

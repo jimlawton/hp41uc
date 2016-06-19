@@ -1,29 +1,29 @@
 /*
-HP41UC.EXE
+HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
-Build environment: Microsoft Visual Studio 32-bit compiler.
+Build environment: Microsoft Visual Studio or GNU C compiler.
 */
 
 /*
-This file is part of HP41UC.EXE.
+This file is part of HP41UC.
 
-HP41UC.EXE is free software: you can redistribute it and/or modify
+HP41UC is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-HP41UC.EXE is distributed in the hope that it will be useful,
+HP41UC is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
+along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// postcript constants
+/* postcript constants */
 #define PS_TOP_MARGIN    748.00
 #define PS_LEFT_MARGIN   86.00
 #define PS_CENTER        ( PS_LEFT_MARGIN - 4.20 )
@@ -39,20 +39,20 @@ along with HP41UC.EXE.  If not, see <http://www.gnu.org/licenses/>.
 #define PS_ONE_PEN       3
 #define PS_ONE_BITS      5
 
-// barcode raster
+/* barcode raster */
 typedef struct {
 	unsigned char bitmap;
 	char bits;
 } RASTER8;
 
-// barcode decoder flags
+/* barcode decoder flags */
 typedef enum {
 	DECODE_FLAG_NONE,
 	DECODE_FLAG_PENDING,
-	DECODE_FLAG_END,
+	DECODE_FLAG_END
 } DECODE_FLAG;
 
-// barcode decoder states
+/* barcode decoder states */
 typedef enum {
 	DECODE_BYTE1,
 	DECODE_BYTE2_OF_2,
@@ -62,7 +62,7 @@ typedef enum {
 	DECODE_BYTE3_GLOBAL,
 	DECODE_BYTE4_GLOBAL,
 	DECODE_BYTE2_ALPHA,
-	DECODE_BYTE_ALPHA,
+	DECODE_BYTE_ALPHA
 } DECODE_STATE;
 
 void get_bc_ext(char *ext);
