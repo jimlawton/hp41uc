@@ -1708,3 +1708,4 @@ int nonxdigit_buffer(unsigned char *buffer, int count)
 
 	return(0);
 }
+

@@ -1331,7 +1331,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 int is_nodisplay(unsigned char code)
 {
-	return(code < 0x20 || code > 0x7F);
+	return(code < 0x20 || code >= 0x7F);
 }
 
 int room_for_key(unsigned char *buffer, int count)
@@ -1450,3 +1450,4 @@ int seek_end(unsigned char *buffer, int count)
 
 	return(end);
 }
+
