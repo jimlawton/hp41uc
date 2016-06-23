@@ -95,7 +95,6 @@ int compile(unsigned char *out_buffer, int out_size,
 		case COMPILE_SEEK_START_LINE:
 			c = *inp++;
 			++consumed;
-
 			if (c == '\n' || c == '\f' || c == 0x1A) {
 				++source_line;
 			}
@@ -1024,6 +1023,7 @@ int is_postfix(unsigned char *postfix, int *pindex)
 int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 {
 	int i, j, k, n;
+	int esc_x;
 
 	*pcount = 0;
 	k = strlen((char *)buffer);
@@ -1041,7 +1041,8 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 		if (j == 0) {
 			/* esc-sequence */
 			if (buffer[i] == '\\' && k) {
-				++j;
+				j = 1;
+				esc_x = 0;
 			}
 			/* append: "|-text", ">-text", "->text" */
 			else if (k && n == 0 &&
@@ -1067,6 +1068,7 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 				text[n++] = buffer[i];
 			}
 		}
+		/* start of esc-sequence */
 		else if (j == 1) {
 			if (isxdigit(buffer[i])) {
 				if (k)
@@ -1075,6 +1077,18 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 					text[n++] = get_xdigit(buffer[i]);
 					j = 0;
 				}
+			}
+			else if (esc_x) {
+				text[n++] = '\\';
+				if (n < MAX_ALPHA) {
+					text[n++] = 'x';
+					if (n < MAX_ALPHA)
+						text[n++] = buffer[i];
+				}
+				j = 0;
+			}
+			else if (buffer[i] == 'x') {
+				esc_x = 1;
 			}
 			else if (buffer[i] == 'a') {
 				text[n++] = '\a';
@@ -1120,23 +1134,20 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 				text[n++] = '\\';
 				j = 0;
 			}
-			else if (buffer[i] != 'x' || k == 0 ||
-				!isxdigit(buffer[i + 1])) {
+			else if (buffer[i] == '-' && n == 0) {
 				/* append: "\-text" */
-				if (buffer[i] == '-' && n == 0) {
-					text[n++] = 0x7F;
-					j = 0;
-				}
-				else {
-					text[n++] = '\\';
-					if (n < MAX_ALPHA) {
-						text[n++] = buffer[i];
-						j = 0;
-					}
-				}
+				text[n++] = 0x7F;
+				j = 0;
+			}
+			else {
+				text[n++] = '\\';
+				if (n < MAX_ALPHA)
+					text[n++] = buffer[i];
+				j = 0;
 			}
 		}
-		else { /* j > 1 */
+		/* second hex-digit in esc-sequence? */
+		else {	/* j == 2 */
 			if (isxdigit(buffer[i])) {
 				text[n++] = (get_xdigit(buffer[i - 1]) << 4) +
 					get_xdigit(buffer[i]);
@@ -1145,14 +1156,15 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 			else {
 				text[n++] = get_xdigit(buffer[i - 1]);
 
-				if (buffer[i] != '\\' || k == 0) {
-					if (n < MAX_ALPHA) {
-						text[n++] = buffer[i];
-						j = 0;
-					}
+				/* start next esc-seqeunce? */
+				if (buffer[i] == '\\' && k) {
+					esc_x = 0;
+					j = 1;
 				}
 				else {
-					j = 1;
+					if (n < MAX_ALPHA)
+						text[n++] = buffer[i];
+					j = 0;
 				}
 			}
 		}

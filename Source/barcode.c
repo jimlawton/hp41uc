@@ -42,12 +42,13 @@ void barcode_init(void)
 
 void barcode(char *infile, char *outfile, char *title)
 {
-	char ext[_MAX_EXT];
+	char bc_ext[_MAX_EXT];
 	int i, j, k;
 	long blk, reg;
 	long prog_pos;
 	long inlength;
 	long outlength = 0;
+	int files;
 	FILE *fin = NULL;
 	FILE *fout = NULL;
 	FIND_FILE rawfile;
@@ -61,16 +62,39 @@ void barcode(char *infile, char *outfile, char *title)
 	int checksum;
 	int row = 1;
 	DECODE_FLAG flag;
+	char clone_dir_path[_MAX_PATH];
+	char clone_file_path[_MAX_PATH];
+	int clone_input = 0;
 
 	/* init strings */
 	bc_title = title;
-	get_bc_ext(ext);
+	get_bc_ext(bc_ext);
 
-	/* get input and output paths */
-	if (getiopath(infile, ".raw", &rawfile, 1, dirpath,
-		outfile, ext, outpath) == 0) {
-		findfile_close(&rawfile);
-		return;
+	/* get input file(s) */
+	if ((files = find_input_files(&rawfile, dirpath, infile, ".raw")) == 0) {
+		goto barcode_exit;
+	}
+
+	/* multiple input files? */
+	if (files > 1) {
+		printf("Error: invalid input path, found[ %d ] files searching[ %s ]\n",
+			files, dirpath);
+		goto barcode_exit;
+	}
+
+	/* get output path */
+	if (outfile == NULL || *outfile == '\0') {
+		clone_dir_path[0] = '\0';
+		clone_input = 1;
+	}
+	else if (get_output_path(outpath, outfile, bc_ext) != 0) {
+		goto barcode_exit;
+	}
+	else if (exists_as_directory(outpath) != -1) {
+		/* outpath is a directory */
+		strcpy(clone_dir_path, outpath);
+		terminate_directory(clone_dir_path);
+		clone_input = 1;
 	}
 
 	/* set input path */
@@ -79,13 +103,23 @@ void barcode(char *infile, char *outfile, char *title)
 	/* set input length */
 	inlength = rawfile.size;
 
+	/* clone output path from input file */
+	if (clone_input) {
+		file_splitpath(rawfile.name, drive, dir, fname, ext);
+		strcpy(clone_file_path, clone_dir_path);
+		strcat(clone_file_path, fname);
+		strcat(clone_file_path, bc_ext);
+		file_fullpath(outpath, clone_file_path);
+	}
+
 	/* open input file */
 	if ((fin = open_input(inpath, inlength, infile, outpath))) {
 		/* open output file */
 		if ((fout = open_output(outpath))) {
 			/* show banner */
 			get_bc_type(ascii);
-			printf("Barcode[ %s ]:  [ %s ] => [ %s ]\n", ascii, inpath, outpath);
+			printf("Barcode[ %s ]:\n", ascii);
+			printf("in[ %s ] => out[ %s ]\n", inpath, outpath);
 
 			if (bc_printer == PRINTER_POSTCRIPT) {
 				/* postcript prolog */
@@ -357,6 +391,7 @@ void barcode(char *infile, char *outfile, char *title)
 		}
 	}
 
+barcode_exit:
 	if (fout) {
 		fflush(fout);
 		if (outlength)

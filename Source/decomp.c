@@ -1234,12 +1234,12 @@ int decompile(unsigned char *out_buffer, int out_size,
 					synth_count -= i;
 					do {
 						c = synth_buffer[i++];
-						if (c >= 0x20 && c <= 0x7E) {
-							*outp++ = c;
+						if (is_nodisplay(c)) {
+							*outp++ = '.';
 							++produced;
 						}
 						else {
-							*outp++ = 0x04;
+							*outp++ = c;
 							++produced;
 						}
 					} while (--synth_count);
@@ -1331,10 +1331,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 int is_nodisplay(unsigned char code)
 {
-	return(code == 0x00 || code == 0x07 || code == 0x08 ||
-		code == 0x09 || code == 0x0A || code == 0x0D ||
-		code == 0x1A || code == 0x1B || code == 0xFF);
-
+	return(code < 0x20 || code > 0x7F);
 }
 
 int room_for_key(unsigned char *buffer, int count)

@@ -66,6 +66,8 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #define _MAX_PATH	(_MAX_DRIVE + _MAX_DIR + _MAX_FNAME + _MAX_EXT)
 #endif
 
+#define MAX_LIF_FILES	448
+
 #ifdef __GNUC__
 int _getch(void);
 int _getche(void);
@@ -134,18 +136,13 @@ void file_splitpath(
 	char* ext
 	);
 
-int getiopath(char *in_file,
-	char *in_ext,
-	FIND_FILE *ff,
-	int max_in_files,
-	char *in_dir,
-	char *out_file,
-	char *out_ext,
-	char *out_path);
+int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext);
+int get_output_path(char *out_path, char *out_file, char *out_ext);
 
 void getfullpath(char *fullpath, char *dirpath, char *name);
 void override_file_ext(char *cur_path, char *new_path, char *new_ext);
-
+int exists_as_directory(char *path);
+void terminate_directory(char *path);
 
 /* file types */
 typedef enum {
