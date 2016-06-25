@@ -28,225 +28,28 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 static long startblk;
 static long dirpos;
 
-void bintoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
+void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name)
 {
 	char pname[11];
+	char p41name[11];
 	long inlength;
 	long outlength = 0;
 	int files;
+	long dirblks, startblk;
 	FILE *fin, *fout = NULL;
-	FIND_FILE binfile;
+	FIND_FILE findfile;
 	char clone_dir_path[_MAX_PATH];
 	char clone_file_path[_MAX_PATH];
 	int clone_input = 0;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&binfile, dirpath, infile, ".bin")) == 0) {
-		goto bintoxxx_exit;
+	if ((files = find_input_files(&findfile, dirpath, infile, pin->ext)) == 0) {
+		goto convert_exit;
 	}
-
-	/* get output path */
-	if (outfile == NULL || *outfile == '\0') {
-		clone_dir_path[0] = '\0';
-		clone_input = 1;
-	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto bintoxxx_exit;
-	}
-	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
-		strcpy(clone_dir_path, outpath);
-		terminate_directory(clone_dir_path);
-		clone_input = 1;
-	}
-	else if (files > 1 && pout->type != FILE_LIF) {
-		/* outpath is a file */
-		printf("Error: found[ %d ] files searching[ %s ], but output[ %s ] is not a LIF file\n",
-			files, dirpath, outpath);
-		goto bintoxxx_exit;
-	}
-
-	if (files > 1) {
-		/* ignore NAME parameter, use input filename instead */
-		name = NULL;
-
-		/* cap input files to MAX_LIF_FILES */
-		if (pout->type == FILE_LIF && files > MAX_LIF_FILES) {
-			printf("Warning: found[ %d ] input files, but using only[ %d ]\n", files, MAX_LIF_FILES);
-			files = MAX_LIF_FILES;
-		}
-	}
-
-	do {
-		/* set input path */
-		getfullpath(inpath, dirpath, binfile.name);
-
-		/* set input length */
-		inlength = binfile.size - 2;
-
-		/* clone output path from input file */
-		if (clone_input) {
-			file_splitpath(binfile.name, drive, dir, fname, ext);
-			strcpy(clone_file_path, clone_dir_path);
-			strcat(clone_file_path, fname);
-			strcat(clone_file_path, pout->ext);
-			file_fullpath(outpath, clone_file_path);
-			fout = NULL;
-		}
-
-		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
-			/* read program size */
-			if ((inlength = read_bin_size(fin, inpath, inlength))) {
-				/* open output file */
-				if (fout || (fout = open_output(outpath))) {
-					/* show banner */
-					printf("bin[ %s ] => %s[ %s ]\n",
-						inpath, pout->banner, outpath);
-
-					/* get program name */
-					get_lif_name(pname, name, binfile.name);
-
-					/* write output file */
-					copy_file(fout, outpath, pout->type, &outlength,
-						pout->type == FILE_RAW ? NULL : pname,
-						files, inlength,
-						fin, inpath, DATA_RAW);
-				}
-			}
-
-			fclose(fin);
-		}
-		--files;
-	} while (fout && files && findfile_next(&binfile) == 0);
-
-bintoxxx_exit:
-	findfile_close(&binfile);
-	closefiles(NULL, fout, outlength, pout->header);
-}
-
-void dattoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
-{
-	char pname[11];
-	long inlength;
-	long outlength = 0;
-	int files;
-	FILE *fin, *fout = NULL;
-	FIND_FILE datfile;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
-
-	/* get input file(s) */
-	if ((files = find_input_files(&datfile, dirpath, infile, ".dat")) == 0) {
-		goto dattoxxx_exit;
-	}
-
-	/* get output path */
-	if (outfile == NULL || *outfile == '\0') {
-		clone_dir_path[0] = '\0';
-		clone_input = 1;
-	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto dattoxxx_exit;
-	}
-	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
-		strcpy(clone_dir_path, outpath);
-		terminate_directory(clone_dir_path);
-		clone_input = 1;
-	}
-	else if (files > 1 && pout->type != FILE_LIF) {
-		/* outpath is a file */
-		printf("Error: found[ %d ] files searching[ %s ], but output[ %s ] is not a LIF file\n",
-			files, dirpath, outpath);
-		goto dattoxxx_exit;
-	}
-
-	if (files > 1) {
-		/* ignore NAME parameter, use input filename instead */
-		name = NULL;
-
-		/* cap input files to MAX_LIF_FILES */
-		if (pout->type == FILE_LIF && files > MAX_LIF_FILES) {
-			printf("Warning: found[ %d ] input files, but using only[ %d ]\n", files, MAX_LIF_FILES);
-			files = MAX_LIF_FILES;
-		}
-	}
-
-	do {
-		/* set input path */
-		getfullpath(inpath, dirpath, datfile.name);
-
-		/* set input length */
-		inlength = datfile.size - 4;
-
-		/* clone output path from input file */
-		if (clone_input) {
-			file_splitpath(datfile.name, drive, dir, fname, ext);
-			strcpy(clone_file_path, clone_dir_path);
-			strcat(clone_file_path, fname);
-			strcat(clone_file_path, pout->ext);
-			file_fullpath(outpath, clone_file_path);
-			fout = NULL;
-		}
-
-		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
-			/* read program size */
-			if ((inlength = read_dat_size(fin, inpath, inlength))) {
-				/* open output file */
-				if (fout || (fout = open_output(outpath))) {
-					/* show banner */
-					printf("dat[ %s ] => %s[ %s ]\n",
-						inpath, pout->banner, outpath);
-
-					/* get program name */
-					get_lif_name(pname, name, datfile.name);
-
-					/* write output file */
-					copy_file(fout, outpath, pout->type, &outlength,
-						pout->type == FILE_RAW ? NULL : pname,
-						files, inlength,
-						fin, inpath, DATA_DAT);
-				}
-			}
-
-			fclose(fin);
-		}
-		--files;
-	} while (fout && files && findfile_next(&datfile) == 0);
-
-dattoxxx_exit:
-	findfile_close(&datfile);
-	closefiles(NULL, fout, outlength, pout->header);
-}
-
-void liftoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
-{
-	char pname[11];
-	long inlength;
-	long outlength = 0;
-	int files;
-	long dirblks;
-	long startblk;
-	FILE *fin = NULL;
-	FILE *fout = NULL;
-	FIND_FILE liffile;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
-
-	/* get input file(s) */
-	if ((files = find_input_files(&liffile, dirpath, infile, ".lif")) == 0) {
-		goto liftoxxx_exit;
-	}
-
-	/* multiple input files? */
-	if (files > 1) {
-		printf("Error: invalid input path, found[ %d ] files searching[ %s ]\n",
+	else if (files > 1 && pin->file_type == FILE_LIF) {
+		printf("Error: found[ %d ] files searching[ %s ], but input type is LIF\n",
 			files, dirpath);
-		goto liftoxxx_exit;
+		goto convert_exit;
 	}
 
 	/* get output path */
@@ -255,105 +58,28 @@ void liftoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
 		clone_input = 1;
 	}
 	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto liftoxxx_exit;
+		goto convert_exit;
 	}
+	/* outpath is a directory? */
 	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
 		strcpy(clone_dir_path, outpath);
 		terminate_directory(clone_dir_path);
 		clone_input = 1;
 	}
-
-	/* set input path */
-	getfullpath(inpath, dirpath, liffile.name);
-
-	/* set input length */
-	inlength = liffile.size;
-
-	/* clone output path from input file */
-	if (clone_input) {
-		file_splitpath(liffile.name, drive, dir, fname, ext);
-		strcpy(clone_file_path, clone_dir_path);
-		strcat(clone_file_path, fname);
-		strcat(clone_file_path, pout->ext);
-		file_fullpath(outpath, clone_file_path);
-	}
-
-	/* open input file */
-	if ((fin = open_input(inpath, inlength, infile, outpath))) {
-		/* read LIF header */
-		if ((dirblks = read_lif_hdr(fin, inpath, inlength))) {
-
-			/* get program name */
-			get_lif_name(pname, name, liffile.name);
-
-			/* read LIF directory */
-			if ((startblk = read_lif_dir(fin, inpath, &inlength, pname,
-				dirblks))) {
-
-				/* open output file */
-				if ((fout = open_output(outpath))) {
-					/* show banner */
-					printf("lif[ %s ] => %s[ %s ]\n",
-						inpath, pout->banner, outpath);
-
-					/* write output file */
-					fseek(fin, startblk * 256, SEEK_SET);
-					copy_file(fout, outpath, pout->type, &outlength,
-						pname, 1, inlength,
-						fin, inpath, DATA_RAW);
-				}
-			}
-		}
-	}
-
-liftoxxx_exit:
-	findfile_close(&liffile);
-	closefiles(fin, fout, outlength, pout->header);
-}
-
-void p41toxxx(char *infile, char *outfile, FILE_DESC *pout)
-{
-	char name[11];
-	char pname[11];
-	long inlength;
-	long outlength = 0;
-	int files;
-	FILE *fin, *fout = NULL;
-	FIND_FILE p41file;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
-
-	/* get input file(s) */
-	if ((files = find_input_files(&p41file, dirpath, infile, ".p41")) == 0) {
-		goto p41toxxx_exit;
-	}
-
-	/* get output path */
-	if (outfile == NULL || *outfile == '\0') {
-		clone_dir_path[0] = '\0';
-		clone_input = 1;
-	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto p41toxxx_exit;
-	}
-	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
-		strcpy(clone_dir_path, outpath);
-		terminate_directory(clone_dir_path);
-		clone_input = 1;
-	}
-	else if (files > 1 && pout->type != FILE_LIF) {
-		/* outpath is a file */
+	/* outpath is a file */
+	else if (files > 1 && pout->file_type != FILE_LIF) {
 		printf("Error: found[ %d ] files searching[ %s ], but output[ %s ] is not a LIF file\n",
 			files, dirpath, outpath);
-		goto p41toxxx_exit;
+		goto convert_exit;
 	}
 
 	if (files > 1) {
+		/* ignore NAME parameter, use input filename instead */
+		if (name)
+			name = NULL;
+
 		/* cap input files to MAX_LIF_FILES */
-		if (pout->type == FILE_LIF && files > MAX_LIF_FILES) {
+		if (pout->file_type == FILE_LIF && files > MAX_LIF_FILES) {
 			printf("Warning: found[ %d ] input files, but using only[ %d ]\n", files, MAX_LIF_FILES);
 			files = MAX_LIF_FILES;
 		}
@@ -361,14 +87,16 @@ void p41toxxx(char *infile, char *outfile, FILE_DESC *pout)
 
 	do {
 		/* set input path */
-		getfullpath(inpath, dirpath, p41file.name);
+		getfullpath(inpath, dirpath, findfile.name);
 
 		/* set input length */
-		inlength = p41file.size - 32;
+		inlength = findfile.size;
+		if (pin->file_type != FILE_LIF)
+			inlength -= pin->header;
 
 		/* clone output path from input file */
 		if (clone_input) {
-			file_splitpath(p41file.name, drive, dir, fname, ext);
+			file_splitpath(findfile.name, drive, dir, fname, ext);
 			strcpy(clone_file_path, clone_dir_path);
 			strcat(clone_file_path, fname);
 			strcat(clone_file_path, pout->ext);
@@ -378,217 +106,68 @@ void p41toxxx(char *infile, char *outfile, FILE_DESC *pout)
 
 		/* open input file */
 		if ((fin = open_input(inpath, inlength, infile, outpath))) {
-			/* read P41 directory */
-			if (read_p41_dir(fin, inpath, &inlength, name)) {
-				/* open output file */
-				if (fout || (fout = open_output(outpath))) {
-					/* show banner */
-					printf("p41[ %s ] => %s[ %s ]\n",
-						inpath, pout->banner, outpath);
-
+			if (pin->file_type == FILE_LIF) {
+				/* read LIF header */
+				if ((dirblks = read_lif_hdr(fin, inpath, inlength))) {
 					/* get program name */
-					get_lif_name(pname, name, p41file.name);
+					get_lif_name(pname, name, findfile.name);
 
-					/* write output file */
-					copy_file(fout, outpath, pout->type, &outlength,
-						pname, files, inlength,
-						fin, inpath, DATA_RAW);
+					/* read LIF directory */
+					if ((startblk = read_lif_dir(fin, inpath, &inlength, pname,
+						dirblks))) {
+
+						/* open output file */
+						if ((fout = open_output(outpath))) {
+							/* show banner */
+							printf("%s[ %s ] => %s[ %s ]\n",
+								pin->banner, inpath, pout->banner, outpath);
+
+							/* write output file */
+							fseek(fin, startblk * 256, SEEK_SET);
+							copy_file(fout, outpath, pout->file_type, &outlength,
+								pname, files, inlength,
+								fin, inpath, pout->data_type);
+						}
+					}
 				}
 			}
-			fclose(fin);
-		}
-		--files;
-	} while (fout && files && findfile_next(&p41file) == 0);
+			else {
+				/* read program size */
+				if (pin->file_type == FILE_BIN)
+					inlength = read_bin_size(fin, inpath, inlength);
+				else if (pin->file_type == FILE_DAT)
+					inlength = read_dat_size(fin, inpath, inlength);
+				else if (pin->file_type == FILE_P41) {
+					inlength = read_p41_dir(fin, inpath, inlength, p41name);
+					name = p41name;
+				}
 
-p41toxxx_exit:
-	findfile_close(&p41file);
-	closefiles(NULL, fout, outlength, pout->header);
-}
+				if (inlength) {
+					/* open output file */
+					if (fout || (fout = open_output(outpath))) {
+						/* show banner */
+						printf("%s[ %s ] => %s[ %s ]\n",
+							pin->banner, inpath, pout->banner, outpath);
 
-void rawtoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
-{
-	char pname[11];
-	long inlength;
-	long outlength = 0;
-	int files;
-	FILE *fin, *fout = NULL;
-	FIND_FILE rawfile;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
+						/* get program name */
+						get_lif_name(pname, name, findfile.name);
 
-	/* get input file(s) */
-	if ((files = find_input_files(&rawfile, dirpath, infile, ".raw")) == 0) {
-		goto rawtoxxx_exit;
-	}
-
-	/* get output path */
-	if (outfile == NULL || *outfile == '\0') {
-		clone_dir_path[0] = '\0';
-		clone_input = 1;
-	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto rawtoxxx_exit;
-	}
-	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
-		strcpy(clone_dir_path, outpath);
-		terminate_directory(clone_dir_path);
-		clone_input = 1;
-	}
-	else if (files > 1 && pout->type != FILE_LIF) {
-		/* outpath is a file */
-		printf("Error: found[ %d ] files searching[ %s ], but output[ %s ] is not a LIF file\n",
-			files, dirpath, outpath);
-		goto rawtoxxx_exit;
-	}
-
-	if (files > 1) {
-		/* ignore NAME parameter, use input filename instead */
-		name = NULL;
-
-		/* cap input files to MAX_LIF_FILES */
-		if (pout->type == FILE_LIF && files > MAX_LIF_FILES) {
-			printf("Warning: found[ %d ] input files, but using only[ %d ]\n", files, MAX_LIF_FILES);
-			files = MAX_LIF_FILES;
-		}
-	}
-
-	do {
-		/* set input path */
-		getfullpath(inpath, dirpath, rawfile.name);
-
-		/* set input length */
-		inlength = rawfile.size;
-
-		/* clone output path from input file */
-		if (clone_input) {
-			file_splitpath(rawfile.name, drive, dir, fname, ext);
-			strcpy(clone_file_path, clone_dir_path);
-			strcat(clone_file_path, fname);
-			strcat(clone_file_path, pout->ext);
-			file_fullpath(outpath, clone_file_path);
-			fout = NULL;
-		}
-
-		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
-			/* open output file */
-			if (fout || (fout = open_output(outpath))) {
-				/* show banner */
-				printf("raw[ %s ] => %s[ %s ]\n",
-					inpath, pout->banner, outpath);
-
-				/* get program name */
-				get_lif_name(pname, name, rawfile.name);
-
-				/* write output file */
-				copy_file(fout, outpath, pout->type, &outlength,
-					pname, files, inlength,
-					fin, inpath, DATA_RAW);
+						/* write output file */
+						copy_file(fout, outpath, pout->file_type, &outlength,
+							pout->file_type == FILE_RAW ? NULL : pname,
+							files, inlength,
+							fin, inpath, pin->data_type);
+					}
+				}
 			}
 
 			fclose(fin);
 		}
 		--files;
-	} while (fout && files && findfile_next(&rawfile) == 0);
+	} while (fout && files && findfile_next(&findfile) == 0);
 
-rawtoxxx_exit:
-	findfile_close(&rawfile);
-	closefiles(NULL, fout, outlength, pout->header);
-}
-
-void txttoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout)
-{
-	char pname[11];
-	long inlength;
-	long outlength = 0;
-	int files;
-	FILE *fin, *fout = NULL;
-	FIND_FILE txtfile;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
-
-	/* get input file(s) */
-	if ((files = find_input_files(&txtfile, dirpath, infile, ".txt")) == 0) {
-		goto txttoxxx_exit;
-	}
-
-	/* get output path */
-	if (outfile == NULL || *outfile == '\0') {
-		clone_dir_path[0] = '\0';
-		clone_input = 1;
-	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
-		goto txttoxxx_exit;
-	}
-	else if (exists_as_directory(outpath) != -1) {
-		/* outpath is a directory */
-		strcpy(clone_dir_path, outpath);
-		terminate_directory(clone_dir_path);
-		clone_input = 1;
-	}
-	else if (files > 1 && pout->type != FILE_LIF) {
-		/* outpath is a file */
-		printf("Error: found[ %d ] files searching[ %s ], but output[ %s ] is not a LIF file\n",
-			files, dirpath, outpath);
-		goto txttoxxx_exit;
-	}
-
-	if (files > 1) {
-		/* ignore NAME parameter, use input filename instead */
-		name = NULL;
-
-		/* cap input files to MAX_LIF_FILES */
-		if (pout->type == FILE_LIF && files > MAX_LIF_FILES ) {
-			printf("Warning: found[ %d ] input files, but using only[ %d ]\n", files, MAX_LIF_FILES);
-			files = MAX_LIF_FILES;
-		}
-	}
-
-	do {
-		/* set input path */
-		getfullpath(inpath, dirpath, txtfile.name);
-
-		/* set input length */
-		inlength = txtfile.size;
-
-		/* clone output path from input file */
-		if (clone_input) {
-			file_splitpath(txtfile.name, drive, dir, fname, ext);
-			strcpy(clone_file_path, clone_dir_path);
-			strcat(clone_file_path, fname);
-			strcat(clone_file_path, pout->ext);
-			file_fullpath(outpath, clone_file_path);
-			fout = NULL;
-		}
-
-		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
-			/* open output file */
-			if (fout || (fout = open_output(outpath))) {
-				/* show banner */
-				printf("txt[ %s ] => %s[ %s ]\n",
-					inpath, pout->banner, outpath);
-
-				/* get program name */
-				get_lif_name(pname, name, txtfile.name);
-
-				/* write output file */
-				copy_file(fout, outpath, pout->type, &outlength,
-					pout->type == FILE_RAW ? NULL : pname,
-					files, inlength,
-					fin, inpath, DATA_TXT);
-			}
-
-			fclose(fin);
-		}
-		--files;
-	} while (fout && files && findfile_next(&txtfile) == 0);
-
-txttoxxx_exit:
-	findfile_close(&txtfile);
+convert_exit:
+	findfile_close(&findfile);
 	closefiles(NULL, fout, outlength, pout->header);
 }
 
@@ -599,7 +178,7 @@ void p41dump(char *infile)
 	FIND_FILE p41file;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&p41file, dirpath, infile, ".p41")) == 0) {
+	if ((files = find_input_files(&p41file, dirpath, infile, p41.ext)) == 0) {
 		goto p41dump_exit;
 	}
 
@@ -610,6 +189,7 @@ void p41dump(char *infile)
 		/* open input file */
 		if ((fin = open_input(inpath, p41file.size, infile, NULL))) {
 			/* dump LIF directry */
+			printf("LIF directory listing[ %s ]\n", inpath);
 			dump_lif_dir(fin, inpath, 1, NULL);
 
 			fclose(fin);
@@ -631,7 +211,7 @@ void lifdump(char *infile, char *name)
 	FIND_FILE liffile;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&liffile, dirpath, infile, ".p41")) == 0) {
+	if ((files = find_input_files(&liffile, dirpath, infile, lif.ext)) == 0) {
 		goto lifdump_exit;
 	}
 
@@ -645,6 +225,7 @@ void lifdump(char *infile, char *name)
 		/* open input file */
 		if ((fin = open_input(inpath, inlength, infile, outpath))) {
 			/* read LIF header */
+			printf("LIF directory listing[ %s ]\n", inpath);
 			if ((dirblks = read_lif_hdr(fin, inpath, inlength))) {
 				/* dump LIF directry */
 				dump_lif_dir(fin, inpath, dirblks * 8, name);
@@ -1286,8 +867,6 @@ void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
 				/* list directory */
 				++entries;
 				if (entries == 1) {
-					printf("\n");
-					printf("LIF directory listing[ %s ]\n", inpath);
 					printf(" name        type  size  implementation\n");
 					printf(" --------------------------------------\n");
 				}
@@ -1369,7 +948,7 @@ long read_dat_size(FILE *fin, char *inpath, long length)
 	return(get_lif_size(buffer2, length / 2) * 2);
 }
 
-long read_p41_dir(FILE *fin, char *inpath, long *plength, char *name)
+long read_p41_dir(FILE *fin, char *inpath, long length, char *name)
 {
 	unsigned char dir[sizeof(lifdir)];
 	unsigned short *pus;
@@ -1403,7 +982,7 @@ long read_p41_dir(FILE *fin, char *inpath, long *plength, char *name)
 	}
 
 	/* get program size */
-	return((*plength = get_lif_size(&dir[28], *plength)));
+	return(get_lif_size(&dir[28], length));
 }
 
 long read_lif_dir(FILE *fin, char *inpath, long *plength, char *name,

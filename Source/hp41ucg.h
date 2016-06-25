@@ -54,36 +54,42 @@ unsigned char buf_1024[1024];
 /* output descriptors */
 FILE_DESC bin = {
 	FILE_BIN,
+	DATA_RAW,
 	2,
 	".bin",
 	"bin",
 };
 FILE_DESC dat = {
 	FILE_DAT,
+	DATA_DAT,
 	4,
 	".dat",
 	"dat",
 };
 FILE_DESC lif = {
 	FILE_LIF,
+	DATA_RAW,
 	768,
 	".lif",
 	"lif",
 };
 FILE_DESC p41 = {
 	FILE_P41,
+	DATA_RAW,
 	32,
 	".p41",
 	"p41",
 };
 FILE_DESC raw = {
 	FILE_RAW,
+	DATA_RAW,
 	0,
 	".raw",
 	"raw",
 };
 FILE_DESC txt = {
 	FILE_TXT,
+	DATA_TXT,
 	0,
 	".txt",
 	"txt",

@@ -68,16 +68,70 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 
 #define MAX_LIF_FILES	448
 
-#ifdef __GNUC__
-int _getch(void);
-int _getche(void);
-char *_strupr(char *str);
-char *to_unix_path(char *p);
-int _fileno(FILE *stream);
-int _stricmp(const char * s1, const char *s2);
-#endif
+/* file types */
+typedef enum {
+	FILE_BIN,
+	FILE_DAT,
+	FILE_LIF,
+	FILE_P41,
+	FILE_RAW,
+	FILE_TXT
+} FILE_TYPE;
 
-long get_filelength(int fd);
+/* data types */
+typedef enum {
+	DATA_DAT,
+	DATA_RAW,
+	DATA_TXT
+} DATA_TYPE;
+
+typedef struct {
+	FILE_TYPE file_type;
+	DATA_TYPE data_type;
+	int header;
+	char *ext;
+	char *banner;
+} FILE_DESC;
+
+extern FILE_DESC bin;
+extern FILE_DESC dat;
+extern FILE_DESC lif;
+extern FILE_DESC p41;
+extern FILE_DESC raw;
+extern FILE_DESC txt;
+
+/* compiler flags */
+typedef enum {
+	COMPILE_FLAG_NONE,
+	COMPILE_FLAG_ERROR,
+	COMPILE_FLAG_END,
+	COMPILE_FLAG_RESTART,
+	COMPILE_FLAG_RESTART_EOF,
+	COMPILE_FLAG_EOF
+} COMPILE_FLAG;
+
+/* barcode printers */
+typedef enum {
+	PRINTER_NONE,
+	PRINTER_HP,
+	PRINTER_POSTCRIPT
+} PRINTER_TYPE;
+
+#ifdef __GNUC__
+typedef enum {
+	FILE_EXIST = F_OK,
+	FILE_WRITE_OK = W_OK,
+	FILE_READ_OK = R_OK,
+	FILE_READ_WRITE = X_OK
+} FILE_MODE;
+#else	 /* _MSC_VER */
+typedef enum {
+	FILE_EXIST = 0,
+	FILE_WRITE_OK = 2,
+	FILE_READ_OK = 4,
+	FILE_READ_WRITE = 6
+} FILE_MODE;
+#endif
 
 /* find files */
 typedef struct {
@@ -97,26 +151,21 @@ typedef struct {
 #endif
 } FIND_FILE;
 
+#ifdef __GNUC__
+int _getch(void);
+int _getche(void);
+char *_strupr(char *str);
+char *to_unix_path(char *p);
+int _fileno(FILE *stream);
+int _stricmp(const char * s1, const char *s2);
+#endif
+
+long get_filelength(int fd);
+
 void findfile_init(FIND_FILE *ff);
 int findfile_first(char *path, FIND_FILE *ff);
 int findfile_next(FIND_FILE *ff);
 void findfile_close(FIND_FILE *ff);
-
-#ifdef __GNUC__
-typedef enum {
-	FILE_EXIST = F_OK,
-	FILE_WRITE_OK = W_OK,
-	FILE_READ_OK = R_OK,
-	FILE_READ_WRITE = X_OK
-} FILE_MODE;
-#else	 /* _MSC_VER */
-typedef enum {
-	FILE_EXIST = 0,
-	FILE_WRITE_OK = 2,
-	FILE_READ_OK = 4,
-	FILE_READ_WRITE = 6
-} FILE_MODE;
-#endif
 
 int file_access(
 	const char *path,
@@ -144,60 +193,9 @@ void override_file_ext(char *cur_path, char *new_path, char *new_ext);
 int exists_as_directory(char *path);
 void terminate_directory(char *path);
 
-/* file types */
-typedef enum {
-	FILE_BIN,
-	FILE_DAT,
-	FILE_LIF,
-	FILE_P41,
-	FILE_RAW,
-	FILE_TXT
-} FILE_TYPE;
-
-/* data types */
-typedef enum {
-	DATA_DAT,
-	DATA_RAW,
-	DATA_TXT
-} DATA_TYPE;
-
-typedef struct {
-	FILE_TYPE type;
-	int header;
-	char *ext;
-	char *banner;
-} FILE_DESC;
-
-/* compiler flags */
-typedef enum {
-	COMPILE_FLAG_NONE,
-	COMPILE_FLAG_ERROR,
-	COMPILE_FLAG_END,
-	COMPILE_FLAG_RESTART,
-	COMPILE_FLAG_RESTART_EOF,
-	COMPILE_FLAG_EOF
-} COMPILE_FLAG;
-
-/* barcode printers */
-typedef enum {
-	PRINTER_NONE,
-	PRINTER_HP,
-	PRINTER_POSTCRIPT
-} PRINTER_TYPE;
-
-void bintoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
-
-void dattoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
-
-void liftoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
+void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name);
 void lifdump(char *infile, char *name);
-
-void p41toxxx(char *infile, char *outfile, FILE_DESC *pout);
 void p41dump(char *infile);
-
-void rawtoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
-
-void txttoxxx(char *infile, char *outfile, char *name, FILE_DESC *pout);
 
 void barcode_init(void);
 void barcode(char *infile, char *outfile, char *title);
@@ -232,7 +230,7 @@ long read_bin_size(FILE *fin, char *inpath, long length);
 
 long read_dat_size(FILE *fin, char *inpath, long length);
 
-long read_p41_dir(FILE *fin, char *inpath, long *plength, char *name);
+long read_p41_dir(FILE *fin, char *inpath, long length, char *name);
 
 long read_lif_dir(FILE *fin, char *inpath, long *plength, char *name,
 	long dirblks);

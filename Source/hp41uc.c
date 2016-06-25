@@ -247,71 +247,71 @@ int main(int argc, char *argv[])
 		else {
 			if (in == 'B') {
 				if (out == 'L') {
-					bintoxxx(infile, outfile, name, &lif);
+					convert(infile, &bin, outfile, &lif, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					bintoxxx(infile, outfile, name, &p41);
+					convert(infile, &bin, outfile, &p41, name);
 					h = 0;
 				}
 				else if (name == 0) {
 					if (out == 'D') {
-						bintoxxx(infile, outfile, NULL, &dat);
+						convert(infile, &bin, outfile, &dat, NULL);
 						h = 0;
 					}
 					else if (out == 'R') {
-						bintoxxx(infile, outfile, NULL, &raw);
+						convert(infile, &bin, outfile, &raw, NULL);
 						h = 0;
 					}
 					else if (out == 'T') {
-						bintoxxx(infile, outfile, NULL, &txt);
+						convert(infile, &bin, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
 			}
 			else if (in == 'D') {
 				if (out == 'L') {
-					dattoxxx(infile, outfile, name, &lif);
+					convert(infile, &dat, outfile, &lif, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					dattoxxx(infile, outfile, name, &p41);
+					convert(infile, &dat, outfile, &p41, name);
 					h = 0;
 				}
 				else if (name == 0) {
 					if (out == 'B') {
-						dattoxxx(infile, outfile, NULL, &bin);
+						convert(infile, &dat, outfile, &bin, NULL);
 						h = 0;
 					}
 					else if (out == 'R') {
-						dattoxxx(infile, outfile, NULL, &raw);
+						convert(infile, &dat, outfile, &raw, NULL);
 						h = 0;
 					}
 					else if (out == 'T') {
-						dattoxxx(infile, outfile, NULL, &txt);
+						convert(infile, &dat, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
 			}
 			else if (in == 'L') {
 				if (out == 'B') {
-					liftoxxx(infile, outfile, name, &bin);
+					convert(infile, &lif, outfile, &bin, name);
 					h = 0;
 				}
 				else if (out == 'D') {
-					liftoxxx(infile, outfile, name, &dat);
+					convert(infile, &lif, outfile, &dat, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					liftoxxx(infile, outfile, name, &p41);
+					convert(infile, &lif, outfile, &p41, name);
 					h = 0;
 				}
 				else if (out == 'R') {
-					liftoxxx(infile, outfile, name, &raw);
+					convert(infile, &lif, outfile, &raw, name);
 					h = 0;
 				}
 				else if (out == 'T') {
-					liftoxxx(infile, outfile, name, &txt);
+					convert(infile, &lif, outfile, &txt, name);
 					h = 0;
 				}
 				else if (out == 0) {
@@ -322,23 +322,23 @@ int main(int argc, char *argv[])
 			else if (in == 'P') {
 				if (name == 0) {
 					if (out == 'B') {
-						p41toxxx(infile, outfile, &bin);
+						convert(infile, &p41, outfile, &bin, NULL);
 						h = 0;
 					}
 					else if (out == 'D') {
-						p41toxxx(infile, outfile, &dat);
+						convert(infile, &p41, outfile, &dat, NULL);
 						h = 0;
 					}
 					else if (out == 'L') {
-						p41toxxx(infile, outfile, &lif);
+						convert(infile, &p41, outfile, &lif, NULL);
 						h = 0;
 					}
 					else if (out == 'R') {
-						p41toxxx(infile, outfile, &raw);
+						convert(infile, &p41, outfile, &raw, NULL);
 						h = 0;
 					}
 					else if (out == 'T') {
-						p41toxxx(infile, outfile, &txt);
+						convert(infile, &p41, outfile, &txt, NULL);
 						h = 0;
 					}
 					else if (out == 0) {
@@ -349,11 +349,11 @@ int main(int argc, char *argv[])
 			}
 			else if (in == 'R') {
 				if (out == 'L') {
-					rawtoxxx(infile, outfile, name, &lif);
+					convert(infile, &raw, outfile, &lif, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					rawtoxxx(infile, outfile, name, &p41);
+					convert(infile, &raw, outfile, &p41, name);
 					h = 0;
 				}
 				else if (out == 'W') {
@@ -363,39 +363,39 @@ int main(int argc, char *argv[])
 				}
 				else if (name == 0) {
 					if (out == 'B') {
-						rawtoxxx(infile, outfile, NULL, &bin);
+						convert(infile, &raw, outfile, &bin, NULL);
 						h = 0;
 					}
 					else if (out == 'D') {
-						rawtoxxx(infile, outfile, NULL, &dat);
+						convert(infile, &raw, outfile, &dat, NULL);
 						h = 0;
 					}
 					else if (out == 'T') {
-						rawtoxxx(infile, outfile, NULL, &txt);
+						convert(infile, &raw, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
 			}
 			else if (in == 'T') {
 				if (out == 'L') {
-					txttoxxx(infile, outfile, name, &lif);
+					convert(infile, &txt, outfile, &lif, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					txttoxxx(infile, outfile, name, &p41);
+					convert(infile, &txt, outfile, &p41, name);
 					h = 0;
 				}
 				else if (name == 0) {
 					if (out == 'B') {
-						txttoxxx(infile, outfile, NULL, &bin);
+						convert(infile, &txt, outfile, &bin, NULL);
 						h = 0;
 					}
 					else if (out == 'D') {
-						txttoxxx(infile, outfile, NULL, &dat);
+						convert(infile, &txt, outfile, &dat, NULL);
 						h = 0;
 					}
 					else if (out == 'R') {
-						txttoxxx(infile, outfile, NULL, &raw);
+						convert(infile, &txt, outfile, &raw, NULL);
 						h = 0;
 					}
 				}
@@ -1049,7 +1049,7 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.20\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.30\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");
