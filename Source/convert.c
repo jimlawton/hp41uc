@@ -75,8 +75,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 
 	if (files > 1) {
 		/* ignore NAME parameter, use input filename instead */
-		if (name)
-			name = NULL;
+		name = NULL;
 
 		/* cap input files to MAX_LIF_FILES */
 		if (pout->file_type == FILE_LIF && files > MAX_LIF_FILES) {
