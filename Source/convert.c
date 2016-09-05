@@ -125,7 +125,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 							fseek(fin, startblk * 256, SEEK_SET);
 							copy_file(fout, outpath, pout->file_type, &outlength,
 								pname, files, inlength,
-								fin, inpath, pout->data_type);
+								fin, inpath, pin->data_type);
 						}
 					}
 				}
