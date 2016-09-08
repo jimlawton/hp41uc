@@ -36,12 +36,10 @@ char ext[_MAX_EXT];
 
 int line_numbers = 0;
 int text_append = 0;
-int raw_checksum = 1;
-int do_xrom23 = 1;
-int do_xrom25 = 1;
-int do_xrom26 = 1;
-int do_xrom28 = 1;
 int force_global = 0;
+int raw_checksum = 1;
+int xrom_count;
+int decomp_xrom[32];
 
 char ascii[80];
 unsigned char buf1_16[16];
@@ -206,43 +204,3 @@ char *alt_postfix117_122[] = {
 	"[", "\\", "]",
 	"^", "_", "`",
 };
-
-char *xrom23[] = {
-	"", "COPYFL", "DIRX", "FLLENG", "FLTYPE", "MCOPY", "MCOPYPV", "MVERIFY",
-	"", "ALENGIO", "ANUNDEL", "ATOXL", "ATOXR", "ATOXX", "XTOAL", "XTOAR",
-	"X<>FIO", "YTOAX", "", "AID", "CLRDEV", "CLRLOOP", "DEVL", "DEVT",
-	"FINDAID", "ID", "INAC", "INACL", "INAE", "INAN", "INXB", "INP",
-	"LOCK", "NLOOP", "NOTREM", "OUTAC", "OUTACL", "OUTAE", "OUTAN", "OUTXB",
-	"OUTP", "POLL", "POLLD", "POLLE", "POLLUNC", "RCLSEL", "SRQ?", "STAT",
-	"XFER", "XFERC", "XREFCL", "XFERE", "XFERN", "", "ADROFF", "ADRON",
-	"DDL", "DDT", "LAD", "SEND", "TAD", "UNL", "UNT",
-};
-
-char *xrom25[] = {
-	"", "ALENG", "ANUM", "APPCHR", "APPREC", "ARCLREC", "AROT", "ATOX",
-	"CLFL", "CLKEYS", "CRFLAS", "CRFLD", "DELCHR", "DELREC", "EMDIR", "FLSIZE",
-	"GETAS", "GETKEY", "GETP", "GETR", "GETREC", "GETRX", "GETSUB", "GETX",
-	"INSCHR", "INSREC", "PASN", "PCLPS", "POSA", "POSFL", "PSIZE", "PURFL",
-	"RCLFLAG", "RCLPT", "RCLPTA", "REGMOVE", "REGSWAP", "SAVEAS", "SAVEP", "SAVER",
-	"SAVERX", "SAVEX", "SEEKPT", "SEEKPTA", "SIZE?", "STOFLAG", "X<>F", "XTOA",
-	"", "ASROOM", "CLRGX", "ED", "EMDIRX", "EMROOM", "GETKEYX", "RESZFL",
-	"SREG?", "X=NN?", "X#NN?", "X<NN?", "X<=NN?", "X>NN?", "X>=NN?",
-};
-
-char *xrom26[] = {
-	"", "ADATE", "ALMCAT", "ALMNOW", "ATIME", "ATIME24", "CLK12", "CLK24",
-	"CLKT", "CLKTD", "CLOCK", "CORRECT", "DATE", "DATE+", "DDAYS", "DMY",
-	"DOW", "MDY", "RCLAF", "RCLSW", "RUNSW", "SETAF", "SETDATE", "SETIME",
-	"SETSW", "STOPSW", "SW", "T+X", "TIME", "XYZALM", "", "CLALMA",
-	"CLALMX", "CLRALMS", "RCLALM", "SWPT",
-};
-
-char *xrom28[] = {
-	"", "CREATE", "DIR", "", "PURGE", "READA", "READK", "READP",
-	"READR", "READRX", "READS", "READSUB", "RENAME", "SEC", "SEEKR", "UNSEC",
-	"VERIFY", "WRTA", "WRTK", "WRTP", "WRTPV", "WRTR", "WRTRX", "WRTS",
-	"ZERO", "", "", "AUTOIO", "FINDIO", "INA", "IND", "INSTAT",
-	"LISTEN", "LOCAL", "MANIO", "OUTA", "PWRDN", "PWRUP", "REMOTE", "SELECT",
-	"STOPIO", "TRIGGER",
-};
-

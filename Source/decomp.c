@@ -26,29 +26,21 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include "hp41uc.h"
 #include "decomp.h"
 
-/* decoder states */
-typedef enum {
-	SEEK_BYTE1,
-	SEEK_BYTE2_OF_2,
-	SEEK_BYTE2_OF_3,
-	SEEK_BYTE3_OF_3,
-	SEEK_BYTE2_GLOBAL,
-	SEEK_BYTE3_GLOBAL,
-	SEEK_BYTE4_GLOBAL,
-	SEEK_BYTE2_ALPHA,
-	SEEK_BYTE_ALPHA,
-} SEEK_STATE;
-
-static int count;
 static int end = 0;
 static int line = 1;
 static int numeric = 0;
+static DECOMPILE_STATE state = BYTE1;
+static SEEK_STATE seek_state = SEEK_BYTE1;
+
+static int count;
 static int synth_flag;
 static int synth_count;
-static DECOMPILE_STATE state = BYTE1;
-
 static int alpha_count;
-static SEEK_STATE seek_state = SEEK_BYTE1;
+
+static int consumed;
+static int produced;
+static unsigned char *in_buffer;
+static unsigned char *out_buffer;
 
 void decompile_init(void)
 {
@@ -59,925 +51,331 @@ void decompile_init(void)
 	seek_state = SEEK_BYTE1;
 }
 
-int decompile(unsigned char *out_buffer, int out_size,
+int decompile(unsigned char *pout_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend)
 {
+	int i, j, k, m;
+	unsigned char c;
+	char **xrom;
+	int do_xrom;
 	int done = 0;
-	int consumed = 0;
-	int produced = 0;
-	int i, j, n, m;
-	unsigned char c, *inp, *outp;
 
-	inp = *pin_buffer;
-	outp = out_buffer;
+	consumed = 0;
+	produced = 0;
+	in_buffer = *pin_buffer;
+	out_buffer = pout_buffer;
+
 	do {
 		switch (state) {
 		case BYTE1:
-			c = *inp;
+			c = *in_buffer;
 			if (c >= 0x10 && c <= 0x1C) {
 				i = c - 1;
-				n = strlen((char *)single01_1C[i]);
-				j = produced + n;
-				if (line_numbers && !numeric) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers && !numeric) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, single01_1C[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
+				if (copy_prefix((char *)single01_1C[i], out_size)) {
 					numeric = 1;
+				}
+				else {
+					done = 1;
 				}
 			}
 			else if (numeric) {
 				numeric = 0;
 				state = APPEND_CR;
 			}
-			else {
-				if (c == 0x00) {
-					++consumed;
-					++inp;
-				}
-				else if (c >= 0x01 && c <= 0x0F) {
-					i = c - 1;
-					n = strlen((char *)single01_1C[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, single01_1C[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = APPEND_CR;
-					}
-				}
-				else if (c == 0x1D) {
-					n = strlen((char *)prefixGTO);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixGTO, n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						synth_flag = 0;
-						synth_count = 1;
-						synth_buffer[0] = c;
-						state = ALPHA_OPEN_QUOTE;
-					}
-				}
-				else if (c == 0x1E) {
-					n = strlen((char *)prefixXEQ);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixXEQ, n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						synth_flag = 0;
-						synth_count = 1;
-						synth_buffer[0] = c;
-						state = ALPHA_OPEN_QUOTE;
-					}
-				}
-				else if (c == 0x1F) {
-					n = strlen((char *)prefixW);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixW, n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						synth_flag = 0;
-						synth_count = 1;
-						synth_buffer[0] = c;
-						state = ALPHA_OPEN_QUOTE;
-					}
-				}
-				else if (c >= 0x20 && c <= 0x8F) {
-					i = c - 0x20;
-					n = strlen((char *)single20_8F[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, single20_8F[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = APPEND_CR;
-					}
-				}
-				else if (c >= 0x90 && c <= 0x9F) {
-					i = c - 0x90;
-					n = strlen((char *)prefix90_9F[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefix90_9F[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_POSTFIX;
-					}
-				}
-				else if (c >= 0xA0 && c <= 0xA7) {
-					++inp;
-					++consumed;
-					count = c & 0x07;
-					state = BYTE2_XROM;
-				}
-				else if (c >= 0xA8 && c <= 0xAD) {
-					i = c - 0xA8;
-					n = strlen((char *)prefixA8_AD[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixA8_AD[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_POSTFIX;
-					}
-				}
-				else if (c == 0xAE) {
-					++inp;
-					++consumed;
-					state = BYTE2_IND;
-				}
-				else if (c == 0xAF) {
-					++inp;
-					++consumed;
-					synth_buffer[0] = c;
-					state = BYTE2_IND_NOP;
-				}
-				else if (c == 0xB0) {
-					++inp;
-					++consumed;
-					synth_buffer[0] = c;
-					state = BYTE2_NOP;
-				}
-				else if (c >= 0xB1 && c <= 0xBF) {
-					i = c - 0xB1;
-					n = strlen((char *)prefixB1_BF[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixB1_BF[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_GTO_IGNORE;
-					}
-				}
-				else if (c >= 0xC0 && c <= 0xCD) {
-					++inp;
-					++consumed;
-					synth_flag = 0;
-					synth_count = 1;
-					synth_buffer[0] = c;
-					state = BYTE2_GLOBAL_IGNORE;
-				}
-				else if (c == 0xCE || c == 0xCF) {
-					i = c - 0xCE;
-					n = strlen((char *)prefixCE_CF[i]);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixCE_CF[i], n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_POSTFIX;
-					}
-				}
-				else if (c >= 0xD0 && c <= 0xDF) {
-					n = strlen((char *)prefixGTO);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixGTO, n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_OF3_IGNORE;
-					}
-				}
-				else if (c >= 0xE0 && c <= 0xEF) {
-					n = strlen((char *)prefixXEQ);
-					j = produced + n;
-					if (line_numbers) {
-						if (line > 999)
-							j += 5;
-						else
-							j += 4;
-					}
-					if (j > out_size)
-						done = 1;
-					else {
-						if (line_numbers) {
-							if (line > 99)
-								sprintf((char *)buffer6, "%d ", line);
-							else
-								sprintf((char *)buffer6, " %02d ", line);
-							++line;
-							if (line > 1999)
-								line = 1;
-							j = strlen((char *)buffer6);
-							memcpy(outp, buffer6, j);
-							outp += j;
-							produced += j;
-						}
-						memcpy(outp, prefixXEQ, n);
-						outp += n;
-						produced += n;
-						++inp;
-						++consumed;
-						state = BYTE2_OF3_IGNORE;
-					}
+			else if (c == 0x00) {
+				++consumed;
+				++in_buffer;
+			}
+			else if (c >= 0x01 && c <= 0x0F) {
+				i = c - 1;
+				if (copy_prefix((char *)single01_1C[i], out_size)) {
+					state = APPEND_CR;
 				}
 				else {
-					++inp;
-					++consumed;
-					count = c & 0x0F;
+					done = 1;
+				}
+			}
+			else if (c == 0x1D) {
+				if (copy_prefix((char *)prefixGTO, out_size)) {
 					synth_flag = 0;
 					synth_count = 1;
 					synth_buffer[0] = c;
-					state = TEXT_OPEN_QUOTE;
+					state = ALPHA_OPEN_QUOTE;
 				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c == 0x1E) {
+				if (copy_prefix((char *)prefixXEQ, out_size)) {
+					synth_flag = 0;
+					synth_count = 1;
+					synth_buffer[0] = c;
+					state = ALPHA_OPEN_QUOTE;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c == 0x1F) {
+				if (copy_prefix((char *)prefixW, out_size)) {
+					synth_flag = 0;
+					synth_count = 1;
+					synth_buffer[0] = c;
+					state = ALPHA_OPEN_QUOTE;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0x20 && c <= 0x8F) {
+				i = c - 0x20;
+				if (copy_prefix((char *)single20_8F[i], out_size)) {
+					state = APPEND_CR;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0x90 && c <= 0x9F) {
+				i = c - 0x90;
+				if (copy_prefix((char *)prefix90_9F[i], out_size)) {
+					state = BYTE2_POSTFIX;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0xA0 && c <= 0xA7) {
+				++in_buffer;
+				++consumed;
+				count = c & 0x07;
+				state = BYTE2_XROM;
+			}
+			else if (c >= 0xA8 && c <= 0xAD) {
+				i = c - 0xA8;
+				if (copy_prefix((char *)prefixA8_AD[i], out_size)) {
+					state = BYTE2_POSTFIX;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c == 0xAE) {
+				++in_buffer;
+				++consumed;
+				state = BYTE2_IND;
+			}
+			else if (c == 0xAF) {
+				++in_buffer;
+				++consumed;
+				synth_buffer[0] = c;
+				state = BYTE2_IND_NOP;
+			}
+			else if (c == 0xB0) {
+				++in_buffer;
+				++consumed;
+				synth_buffer[0] = c;
+				state = BYTE2_NOP;
+			}
+			else if (c >= 0xB1 && c <= 0xBF) {
+				i = c - 0xB1;
+				if (copy_prefix((char *)prefixB1_BF[i], out_size)) {
+					state = BYTE2_GTO_IGNORE;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0xC0 && c <= 0xCD) {
+				++in_buffer;
+				++consumed;
+				synth_flag = 0;
+				synth_count = 1;
+				synth_buffer[0] = c;
+				state = BYTE2_GLOBAL_IGNORE;
+			}
+			else if (c == 0xCE || c == 0xCF) {
+				i = c - 0xCE;
+				if (copy_prefix((char *)prefixCE_CF[i], out_size)) {
+					state = BYTE2_POSTFIX;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0xD0 && c <= 0xDF) {
+				if (copy_prefix((char *)prefixGTO, out_size)) {
+					state = BYTE2_OF3_IGNORE;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else if (c >= 0xE0 && c <= 0xEF) {
+				if (copy_prefix((char *)prefixXEQ, out_size)) {
+					state = BYTE2_OF3_IGNORE;
+				}
+				else {
+					done = 1;
+				}
+			}
+			else {
+				++in_buffer;
+				++consumed;
+				count = c & 0x0F;
+				synth_flag = 0;
+				synth_count = 1;
+				synth_buffer[0] = c;
+				state = TEXT_OPEN_QUOTE;
 			}
 			break;
 
 		case BYTE2_IND_NOP:
-			c = *inp;
+			c = *in_buffer;
 			if (c < 0x80) {
-				n = strlen((char *)prefixGTO_IND_NOP);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixGTO_IND_NOP, n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
+				if (copy_prefix((char *)prefixGTO_IND_NOP, out_size)) {
 					synth_flag = 1;
 					synth_count = 2;
 					synth_buffer[1] = c;
 					state = APPEND_SYNTH;
+				}
+				else {
+					done = 1;
 				}
 			}
 			else {
-				n = strlen((char *)prefixXEQ_IND_NOP);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixXEQ_IND_NOP, n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
+				if (copy_prefix((char *)prefixXEQ_IND_NOP, out_size)) {
 					synth_flag = 1;
 					synth_count = 2;
 					synth_buffer[1] = c;
 					state = APPEND_SYNTH;
+				}
+				else {
+					done = 1;
 				}
 			}
 			break;
 
 		case BYTE2_NOP:
-			c = *inp;
-			n = strlen((char *)prefixGTO_NOP);
-			j = produced + n;
-			if (line_numbers) {
-				if (line > 999)
-					j += 5;
-				else
-					j += 4;
-			}
-			if (j > out_size)
-				done = 1;
-			else {
-				if (line_numbers) {
-					if (line > 99)
-						sprintf((char *)buffer6, "%d ", line);
-					else
-						sprintf((char *)buffer6, " %02d ", line);
-					++line;
-					if (line > 1999)
-						line = 1;
-					j = strlen((char *)buffer6);
-					memcpy(outp, buffer6, j);
-					outp += j;
-					produced += j;
-				}
-				memcpy(outp, prefixGTO_NOP, n);
-				outp += n;
-				produced += n;
-				++inp;
-				++consumed;
+			c = *in_buffer;
+			if (copy_prefix((char *)prefixGTO_NOP, out_size)) {
 				synth_flag = 1;
 				synth_count = 2;
 				synth_buffer[1] = c;
 				state = APPEND_SYNTH;
 			}
+			else {
+				done = 1;
+			}
 			break;
 
 		case BYTE2_GTO_IGNORE:
-			++inp;
+			++in_buffer;
 			++consumed;
 			state = APPEND_CR;
 			break;
 
 		case BYTE2_XROM:
-			c = *inp;
+			c = *in_buffer;
 			m = (count << 2) + (c >> 6);
 			i = c & 0x3F;
-			if (do_xrom23 && m == 23 &&
-				((i >= 1 && i <= 7) || (i >= 9 && i <= 17) ||
-				(i >= 19 && i <= 52) || (i >= 54 && i <= 62))) {
-				n = strlen((char *)xrom23[i]);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
+			j = sizeof(xrom_list) / sizeof(XROM_DECOMP);
+			for (k = 0, do_xrom = 0; k < j && do_xrom == 0; ++k) {
+				xrom = xrom_list[k].xrom;
+				if (m && m < xrom_count && decomp_xrom[m] &&
+					m == xrom_list[k].module_id &&
+					i < xrom_list[k].functions &&
+					xrom && strlen(xrom[i])) {
+					do_xrom = 1;
+					if (copy_prefix(xrom[i], out_size)) {
+						state = APPEND_CR;
 					}
-					memcpy(outp, xrom23[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
-					state = APPEND_CR;
+					else {
+						done = 1;
+					}
 				}
 			}
-			else if (do_xrom25 && m == 25 &&
-				((i >= 1 && i <= 47) || (i >= 49 && i <= 62))) {
-				n = strlen((char *)xrom25[i]);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, xrom25[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
+			if (do_xrom == 0 &&
+				m < MAX_XROM_MODULES &&
+				i < MAX_ROM_FUNCTIONS) {
+				sprintf((char *)buffer6, "%02d", m);
+				memcpy(&prefixXROM[5], buffer6, 2);
+				sprintf((char *)buffer6, "%02d", i);
+				memcpy(&prefixXROM[8], buffer6, 2);
+				if (copy_prefix((char *)prefixXROM, out_size)) {
 					state = APPEND_CR;
 				}
-			}
-			else if (do_xrom26 && m == 26 &&
-				((i >= 1 && i <= 29) || (i >= 31 && i <= 35))) {
-				n = strlen((char *)xrom26[i]);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
 				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, xrom26[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
-					state = APPEND_CR;
-				}
-			}
-			else if (do_xrom28 && m == 28 &&
-				((i >= 1 && i <= 2) || (i >= 4 && i <= 24) ||
-				(i >= 27 && i <= 41))) {
-				n = strlen((char *)xrom28[i]);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
 					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, xrom28[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
-					state = APPEND_CR;
-				}
-			}
-			else {
-				n = strlen((char *)prefixXROM);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					sprintf((char *)buffer6, "%02d", m);
-					memcpy(&prefixXROM[5], buffer6, 2);
-					sprintf((char *)buffer6, "%02d", i);
-					memcpy(&prefixXROM[8], buffer6, 2);
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixXROM, n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
-					state = APPEND_CR;
 				}
 			}
 			break;
 
 		case BYTE2_IND:
-			c = *inp;
+			c = *in_buffer;
 			if (c < 0x80) {
 				i = c;
-				n = strlen((char *)prefixGTO_IND);
-				m = strlen((char *)postfix00_7F[i]);
-				j = produced + n + m;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixGTO_IND, n);
-					outp += n;
-					memcpy(outp, postfix00_7F[i], m);
-					outp += m;
-					produced += n + m;
-					++inp;
-					++consumed;
+				if (copy_prefix2((char *)prefixGTO_IND, (char *)postfix00_7F[i], out_size)) {
 					state = APPEND_CR;
+				}
+				else {
+					done = 1;
 				}
 			}
 			else {
 				i = c & 0x7F;
-				n = strlen((char *)prefixXEQ_IND);
-				m = strlen((char *)postfix00_7F[i]);
-				j = produced + n + m;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixXEQ_IND, n);
-					outp += n;
-					memcpy(outp, postfix00_7F[i], m);
-					outp += m;
-					produced += n + m;
-					++inp;
-					++consumed;
+				if (copy_prefix2((char *)prefixXEQ_IND, (char *)postfix00_7F[i], out_size)) {
 					state = APPEND_CR;
+				}
+				else {
+					done = 1;
 				}
 			}
 			break;
 
 		case BYTE2_POSTFIX:
-			i = *inp;
-			if (i < 0x80) {
-				n = strlen((char *)postfix00_7F[i]);
-				j = produced + n;
-				if (j > out_size)
-					done = 1;
-				else {
-					memcpy(outp, postfix00_7F[i], n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
+			c = *in_buffer;
+			if (c < 0x80) {
+				i = c;
+				if (copy_postfix((char *)postfix00_7F[i], out_size)) {
 					state = APPEND_CR;
+				}
+				else {
+					done = 1;
 				}
 			}
 			else {
-				i &= 0x7F;
-				n = strlen((char *)postfixIND);
-				m = strlen((char *)postfix00_7F[i]);
-				j = produced + n + m;
-				if (j > out_size)
-					done = 1;
-				else {
-					memcpy(outp, postfixIND, n);
-					outp += n;
-					memcpy(outp, postfix00_7F[i], m);
-					outp += m;
-					produced += n + m;
-					++inp;
-					++consumed;
+				i = c & 0x7F;
+				if (copy_postfix2((char *)postfixIND, (char *)postfix00_7F[i], out_size)) {
 					state = APPEND_CR;
+				}
+				else {
+					done = 1;
 				}
 			}
 			break;
 
 		case BYTE2_OF3_IGNORE:
-			++inp;
+			++in_buffer;
 			++consumed;
 			state = BYTE3_POSTFIX;
 			break;
 
 		case BYTE3_POSTFIX:
-			i = (*inp) & 0x7F;
-			n = strlen((char *)postfix00_7F[i]);
-			j = produced + n;
-			if (j > out_size)
-				done = 1;
-			else {
-				memcpy(outp, postfix00_7F[i], n);
-				outp += n;
-				produced += n;
-				++inp;
-				++consumed;
+			c = *in_buffer;
+			i = c & 0x7F;
+			if (copy_postfix((char *)postfix00_7F[i], out_size)) {
 				state = APPEND_CR;
+			}
+			else {
+				done = 1;
 			}
 			break;
 
 		case BYTE2_GLOBAL_IGNORE:
-			c = *inp++;
+			c = *in_buffer++;
 			++consumed;
 			++synth_count;
 			synth_buffer[1] = c;
@@ -985,72 +383,18 @@ int decompile(unsigned char *out_buffer, int out_size,
 			break;
 
 		case BYTE3_GLOBAL:
-			c = *inp;
+			c = *in_buffer;
 			if (c < 0xF0) {
-				n = strlen((char *)prefixEND);
-				j = produced + n;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixEND, n);
-					outp += n;
-					produced += n;
-					++inp;
-					++consumed;
-					end = 1;
+				if (copy_prefix((char *)prefixEND, out_size)) {
 					state = APPEND_CR;
+					end = 1;
+				}
+				else {
+					done = 1;
 				}
 			}
 			else {
-				n = strlen((char *)prefixLBL);
-				j = produced + n + 1;
-				if (line_numbers) {
-					if (line > 999)
-						j += 5;
-					else
-						j += 4;
-				}
-				if (j > out_size)
-					done = 1;
-				else {
-					if (line_numbers) {
-						if (line > 99)
-							sprintf((char *)buffer6, "%d ", line);
-						else
-							sprintf((char *)buffer6, " %02d ", line);
-						++line;
-						if (line > 1999)
-							line = 1;
-						j = strlen((char *)buffer6);
-						memcpy(outp, buffer6, j);
-						outp += j;
-						produced += j;
-					}
-					memcpy(outp, prefixLBL, n);
-					outp += n;
-					*outp++ = '\"';
-					produced += n + 1;
-					++inp;
-					++consumed;
+				if (copy_prefix2((char *)prefixLBL, "\"", out_size)) {
 					++synth_count;
 					synth_buffer[2] = c;
 					count = c & 0x0F;
@@ -1061,11 +405,14 @@ int decompile(unsigned char *out_buffer, int out_size,
 						state = CLOSE_QUOTE;
 					}
 				}
+				else {
+					done = 1;
+				}
 			}
 			break;
 
 		case BYTE4_GLOBAL_IGNORE:
-			c = *inp++;
+			c = *in_buffer++;
 			++consumed;
 			++synth_count;
 			synth_buffer[3] = c;
@@ -1079,9 +426,9 @@ int decompile(unsigned char *out_buffer, int out_size,
 			break;
 
 		case ALPHA_OPEN_QUOTE:
-			c = *inp++;
+			c = *in_buffer++;
 			++consumed;
-			*outp++ = '\"';
+			*out_buffer++ = '\"';
 			++produced;
 			++synth_count;
 			synth_buffer[1] = c;
@@ -1097,7 +444,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 		case TEXT_OPEN_QUOTE:
 			if (count)
-				j = produced + 2;
+				j = produced + 5;
 			else
 				j = produced + 1;
 			if (line_numbers) {
@@ -1118,39 +465,39 @@ int decompile(unsigned char *out_buffer, int out_size,
 					if (line > 1999)
 						line = 1;
 					j = strlen((char *)buffer6);
-					memcpy(outp, buffer6, j);
-					outp += j;
+					memcpy(out_buffer, buffer6, j);
+					out_buffer += j;
 					produced += j;
 				}
 
 				if (count) {
-					c = *inp++;
+					c = *in_buffer++;
 					++consumed;
 					if (c == 0x7F) {
 						if (text_append) {
-							*outp++ = '\"';
-							*outp++ = '|';
-							*outp++ = '-';
+							*out_buffer++ = '\"';
+							*out_buffer++ = '|';
+							*out_buffer++ = '-';
 							++produced;
 						}
 						else {
-							*outp++ = '>';
-							*outp++ = '\"';
+							*out_buffer++ = '>';
+							*out_buffer++ = '\"';
 						}
 					}
 					else {
-						*outp++ = '\"';
+						*out_buffer++ = '\"';
 						if (is_nodisplay(c)) {
-							*outp++ = '\\';
-							*outp++ = 'x';
+							*out_buffer++ = '\\';
+							*out_buffer++ = 'x';
 							sprintf((char *)buffer6, "%02X", c);
-							memcpy(outp, buffer6, 2);
-							outp += 2;
+							memcpy(out_buffer, buffer6, 2);
+							out_buffer += 2;
 							produced += 3;
 							synth_flag = 1;
 						}
 						else {
-							*outp++ = c;
+							*out_buffer++ = c;
 						}
 					}
 					--count;
@@ -1159,7 +506,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 					synth_buffer[1] = c;
 				}
 				else {
-					*outp++ = '\"';
+					*out_buffer++ = '\"';
 					++produced;
 					synth_flag = 1;
 				}
@@ -1171,19 +518,19 @@ int decompile(unsigned char *out_buffer, int out_size,
 			break;
 
 		case BYTE_ALPHA:
-			c = *inp++;
+			c = *in_buffer++;
 			++consumed;
 			if (is_nodisplay(c)) {
-				*outp++ = '\\';
-				*outp++ = 'x';
+				*out_buffer++ = '\\';
+				*out_buffer++ = 'x';
 				sprintf((char *)buffer6, "%02X", c);
-				memcpy(outp, buffer6, 2);
-				outp += 2;
+				memcpy(out_buffer, buffer6, 2);
+				out_buffer += 2;
 				produced += 3;
 				synth_flag = 1;
 			}
 			else {
-				*outp++ = c;
+				*out_buffer++ = c;
 			}
 			++produced;
 			--count;
@@ -1193,7 +540,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 			break;
 
 		case CLOSE_QUOTE:
-			*outp++ = '\"';
+			*out_buffer++ = '\"';
 			++produced;
 			if (synth_flag)
 				state = APPEND_SYNTH;
@@ -1223,31 +570,31 @@ int decompile(unsigned char *out_buffer, int out_size,
 				else
 					i = 0;
 
-				*outp++ = 0x20;
-				*outp++ = 0x20;
-				*outp++ = ';';
+				*out_buffer++ = 0x20;
+				*out_buffer++ = 0x20;
+				*out_buffer++ = ';';
 				produced += 3;
 				if (i) {
 					j = room_for_key(synth_buffer, synth_count);
-					*outp++ = '\"';
+					*out_buffer++ = '\"';
 					++produced;
 					synth_count -= i;
 					do {
 						c = synth_buffer[i++];
 						if (is_nodisplay(c)) {
-							*outp++ = '.';
+							*out_buffer++ = '.';
 							++produced;
 						}
 						else {
-							*outp++ = c;
+							*out_buffer++ = c;
 							++produced;
 						}
 					} while (--synth_count);
-					*outp++ = '\"';
+					*out_buffer++ = '\"';
 					++produced;
 					if (j) {
-						copy_key(outp, synth_buffer[3]);
-						outp += j;
+						copy_key(out_buffer, synth_buffer[3]);
+						out_buffer += j;
 						produced += j;
 					}
 					state = APPEND_CR;
@@ -1256,12 +603,12 @@ int decompile(unsigned char *out_buffer, int out_size,
 					do {
 						c = synth_buffer[i++];
 						sprintf((char *)buffer6, "%02X", c);
-						memcpy(outp, buffer6, 2);
-						outp += 2;
+						memcpy(out_buffer, buffer6, 2);
+						out_buffer += 2;
 						produced += 2;
 						--synth_count;
 						if (synth_count) {
-							*outp++ = ',';
+							*out_buffer++ = ',';
 							++produced;
 						}
 					} while (synth_count);
@@ -1276,25 +623,25 @@ int decompile(unsigned char *out_buffer, int out_size,
 			if (j > out_size)
 				done = 1;
 			else {
-				*outp++ = 0x20;
-				*outp++ = 0x20;
-				*outp++ = ';';
+				*out_buffer++ = 0x20;
+				*out_buffer++ = 0x20;
+				*out_buffer++ = ';';
 				produced += 3;
-				copy_key(outp, synth_buffer[3]);
-				outp += i;
+				copy_key(out_buffer, synth_buffer[3]);
+				out_buffer += i;
 				produced += i;
 				state = APPEND_CR;
 			}
 			break;
 
 		case APPEND_CR:
-			*outp++ = 0x0D;
+			*out_buffer++ = 0x0D;
 			++produced;
 			state = APPEND_LF;
 			break;
 
 		case APPEND_LF:
-			*outp++ = 0x0A;
+			*out_buffer++ = 0x0A;
 			++produced;
 			if (end)
 				done = 1;
@@ -1315,7 +662,7 @@ int decompile(unsigned char *out_buffer, int out_size,
 
 	} while (!done);
 
-	/* output pending? */
+	/* out_bufferut pending? */
 	*ppending = state == CLOSE_QUOTE ||
 		state == APPEND_SYNTH ||
 		state == APPEND_KEY ||
@@ -1327,6 +674,124 @@ int decompile(unsigned char *out_buffer, int out_size,
 	*pin_count -= consumed;
 	*pend = end;
 	return(produced);
+}
+
+int copy_prefix(char *prefix, int out_size)
+{
+	int j, n;
+
+	n = strlen(prefix);
+	j = produced + n;
+	if (line_numbers && !numeric) {
+		if (line > 999)
+			j += 5;
+		else
+			j += 4;
+	}
+	if (j > out_size)
+		return 0;
+
+	if (line_numbers && !numeric) {
+		if (line > 99)
+			sprintf((char *)buffer6, "%d ", line);
+		else
+			sprintf((char *)buffer6, " %02d ", line);
+		++line;
+		if (line > 1999)
+			line = 1;
+		j = strlen((char *)buffer6);
+		memcpy(out_buffer, buffer6, j);
+		out_buffer += j;
+		produced += j;
+	}
+
+	memcpy(out_buffer, prefix, n);
+	out_buffer += n;
+	produced += n;
+	++in_buffer;
+	++consumed;
+
+	return n;
+}
+
+int copy_prefix2(char *prefix1, char *prefix2, int out_size)
+{
+	int j, n, m;
+
+	n = strlen(prefix1);
+	m = strlen(prefix2);
+	j = produced + n + m;
+	if (line_numbers) {
+		if (line > 999)
+			j += 5;
+		else
+			j += 4;
+	}
+	if (j > out_size)
+		return 0;
+
+	if (line_numbers) {
+		if (line > 99)
+			sprintf((char *)buffer6, "%d ", line);
+		else
+			sprintf((char *)buffer6, " %02d ", line);
+		++line;
+		if (line > 1999)
+			line = 1;
+		j = strlen((char *)buffer6);
+		memcpy(out_buffer, buffer6, j);
+		out_buffer += j;
+		produced += j;
+	}
+
+	memcpy(out_buffer, prefix1, n);
+	out_buffer += n;
+	memcpy(out_buffer, prefix2, m);
+	out_buffer += m;
+	produced += n + m;
+	++in_buffer;
+	++consumed;
+
+	return n + m;
+}
+
+int copy_postfix(char *postfix, int out_size)
+{
+	int j, n;
+
+	n = strlen(postfix);
+	j = produced + n;
+	if (j > out_size)
+		return 0;
+
+	memcpy(out_buffer, postfix, n);
+	out_buffer += n;
+	produced += n;
+	++in_buffer;
+	++consumed;
+
+	return n;
+}
+
+int copy_postfix2(char *postfix1, char *postfix2, int out_size)
+{
+	int j, n, m;
+
+	n = strlen(postfix1);
+	m = strlen(postfix2);
+	j = produced + n + m;
+	if (j > out_size)
+		return 0;
+
+	memcpy(out_buffer, postfix1, n);
+	out_buffer += n;
+	memcpy(out_buffer, postfix2, m);
+	out_buffer += m;
+	produced += n + m;
+	++in_buffer;
+	++consumed;
+
+	return n + m;
 }
 
 int is_nodisplay(unsigned char code)

@@ -35,7 +35,11 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef __GNUC__
 #include <stddef.h>
+#ifdef __DJGPP__
+#include <io.h>
+#else
 #include <sys/io.h>
+#endif
 #include <unistd.h>		/* access() */
 #include <dirent.h>		/* opendir() */
 #include <limits.h>		/* realpath() */
@@ -158,6 +162,7 @@ char *_strupr(char *str);
 char *to_unix_path(char *p);
 int _fileno(FILE *stream);
 int _stricmp(const char * s1, const char *s2);
+int _strnicmp(const char * s1, const char *s2, size_t n);
 #endif
 
 long get_filelength(int fd);
@@ -307,11 +312,9 @@ extern char ext[_MAX_EXT];
 extern int line_numbers;
 extern int text_append;
 extern int raw_checksum;
-extern int do_xrom23;
-extern int do_xrom25;
-extern int do_xrom26;
-extern int do_xrom28;
 extern int force_global;
+extern int xrom_count;
+extern int decomp_xrom[32];
 
 extern char ascii[80];
 extern unsigned char buf1_16[16];

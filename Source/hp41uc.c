@@ -32,6 +32,13 @@ int main(int argc, char *argv[])
 	char in = 0, out = 0;
 	char *name = 0;
 	char *infile = 0, *outfile = 0;
+	int xrom_id;
+	char *endptr;
+
+	/* decmpile XROMs by default */
+	xrom_count = sizeof(decomp_xrom) / sizeof(int);
+	for (xrom_id = 0; xrom_id < xrom_count; ++xrom_id)
+		decomp_xrom[xrom_id] = 1;
 
 	/* parser */
 	for (h = 0, i = 1; i < argc && !h; ++i) {
@@ -78,28 +85,17 @@ int main(int argc, char *argv[])
 			_stricmp(argv[i], "/k") == 0) {
 			raw_checksum = 0;
 		}
-		else if (_stricmp(argv[i], "-x") == 0 ||
-			_stricmp(argv[i], "/x") == 0) {
-			do_xrom23 = 0;
-			do_xrom25 = 0;
-			do_xrom26 = 0;
-			do_xrom28 = 0;
-		}
-		else if (_stricmp(argv[i], "-x23") == 0 ||
-			_stricmp(argv[i], "/x23") == 0) {
-			do_xrom23 = 0;
-		}
-		else if (_stricmp(argv[i], "-x25") == 0 ||
-			_stricmp(argv[i], "/x25") == 0) {
-			do_xrom25 = 0;
-		}
-		else if (_stricmp(argv[i], "-x26") == 0 ||
-			_stricmp(argv[i], "/x26") == 0) {
-			do_xrom26 = 0;
-		}
-		else if (_stricmp(argv[i], "-x28") == 0 ||
-			_stricmp(argv[i], "/x28") == 0) {
-			do_xrom28 = 0;
+		else if (_strnicmp(argv[i], "-x", 2) == 0 ||
+			_strnicmp(argv[i], "/x", 2) == 0) {
+			if (strlen(argv[i]) == 2) {
+				for (xrom_id = 0; xrom_id < xrom_count; ++xrom_id)
+					decomp_xrom[xrom_id] = 0;
+			}
+			else {
+				xrom_id = (int)strtoul(&argv[i][2], &endptr, 10);
+				if (xrom_id && xrom_id < xrom_count)
+					decomp_xrom[xrom_id] = 0;
+			}
 		}
 		else if (k) {
 			if (argv[i][j] == 'b' || argv[i][j] == 'B') {
@@ -907,6 +903,11 @@ int _stricmp(const char * s1, const char *s2)
 {
 	return strcasecmp(s1, s2);
 }
+
+int _strnicmp(const char * s1, const char *s2, size_t n)
+{
+	return strncasecmp(s1, s2, n);
+}
 #endif
 
 long get_filelength(int fd)
@@ -1049,7 +1050,7 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.31\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.40\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");
@@ -1230,10 +1231,7 @@ void help(int do_help)
 		printf("  /a - append text using: [ \"|-text\" ], instead of: [ >\"text\" ]\n");
 		printf("  /n - generate line numbers\n");
 		printf("  /x - use [ XROM mm,ff ] for all XROM Functions\n");
-		printf("  /x23 - use [ XROM 23,ff ]: [ XROM 23,1 ], instead of [ COPYFL ]\n");
-		printf("  /x25 - use [ XROM 25,ff ]: [ XROM 25,46 ], instead of [ X<>F ]\n");
-		printf("  /x26 - use [ XROM 26,ff ]: [ XROM 26,10 ], instead of [ CLOCK ]\n");
-		printf("  /x28 - use [ XROM 28,ff ]: [ XROM 28,27 ], instead of [ AUTOIO ]\n");
+		printf("  /x## - for ## = 1..31, use [ XROM ##,ff ]: [ XROM 25,46 ], instead of [ X<>F ]\n");
 	}
 }
 
