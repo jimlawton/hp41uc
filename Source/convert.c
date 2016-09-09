@@ -25,9 +25,6 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "hp41uc.h"
 
-static long startblk;
-static long dirpos;
-
 void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name)
 {
 	char pname[11];
@@ -248,6 +245,9 @@ void copy_file(FILE *fout, char *outpath,
 	unsigned char *puc;
 	unsigned char chksum;
 	long lsize, dirblk;
+	/* copy_file() may be called multiple times for the same LIF output file */
+	static long startblk;
+	static long dirpos;
 
 	/* write program blocks */
 	if (outftype == FILE_RAW) {
@@ -323,7 +323,7 @@ void copy_file(FILE *fout, char *outpath,
 			}
 		}
 
-		/* over-write directory */
+		/* over-write empty directory */
 		fseek(fout, dirpos, SEEK_SET);
 		dirpos += write_lif_dir(fout, pname, dirblk, lsize);
 	}
@@ -1014,14 +1014,14 @@ long read_lif_dir(FILE *fin, char *inpath, long *plength, char *name,
 				else if (*pus == 0x80E0) {
 					/* search for matching name */
 					if ((match = is_lif_name((char *)plif, name))) {
-						/* get program start block */
+						/* get program start block (motorola format) */
 						puc = (unsigned char *)&startblk;
 						puc[0] = plif[15];
 						puc[1] = plif[14];
 						puc[2] = plif[13];
 						puc[3] = plif[12];
 
-						/* get program size */
+						/* get program size (motorola format) */
 						puc = (unsigned char *)&size;
 						puc[3] = puc[2] = 0;
 						puc[1] = plif[28];
@@ -1213,13 +1213,14 @@ long write_lif_hdr(FILE *fout, long *pstartblk, long *pdirpos, int files)
 	memset(buf1_256, 0, sizeof(buf1_256));
 	memcpy(buf1_256, lifhdr, sizeof(lifhdr));
 
-	/* directory length in blocks (1..448 files) */
+	/* directory length in blocks (motorola format): header[19..16]  */
 	blk = files * 32 / 256;
 	if (blk * 256 < files * 32)
 		++blk;
+	/* max of 255 blocks, at 8 files per block = 2040 files */
 	buf1_256[19] = (unsigned char)blk;
 
-	/* write header */
+	/* write header at block[0], and filler (0) at block[1] */
 	length = fwrite(buf1_256, 1, sizeof(buf1_256), fout);
 	memset(buf1_256, 0, sizeof(lifhdr));
 	length += fwrite(buf1_256, 1, sizeof(buf1_256), fout);
