@@ -661,7 +661,7 @@ int compile_arg1(unsigned char *code, unsigned char *prefix)
 		}
 	}
 
-	printf("Error: unrecognized or imcomplete function[ %s ]\n", prefix);
+	printf("Error: unrecognized or incomplete function[ %s ]\n", prefix);
 	printf("If [ %s ] is an external module function, try: [ XROM mm,ff ]\n",
 		prefix);
 	return(0);
