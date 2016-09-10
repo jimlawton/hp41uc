@@ -645,7 +645,7 @@ int findfile_first(char *path, FIND_FILE *ff)
 	struct stat f_stats;
 	DIR *pdir, *f_pdir;
 	char f_path[_MAX_PATH];
-	char *f_dir;
+	char f_dir[_MAX_PATH];
 	int check_path_end = 0;
 
 	if (ff == NULL)
@@ -660,12 +660,12 @@ int findfile_first(char *path, FIND_FILE *ff)
 		if (strcmp(fname, "*") == 0) {
 			strcpy(f_path, drive);
 			strcat(f_path, dir);
-			f_dir = f_path;
+			strcpy(f_dir, f_path);
 			if (strcmp(ext, ".*") != 0) 
 				strcpy(ff->data.file_ext, ext);
 		}
 		else {
-			f_dir = path;
+			strcpy(f_dir, path);
 			check_path_end = 1;
 		}
 
@@ -690,17 +690,14 @@ int findfile_first(char *path, FIND_FILE *ff)
 					strcpy(f_path, ff->data.dir_path);
 					strcat(f_path, ffd->d_name);
 
-					/* searching for specific file.ext? */
-					if (ff->data.file_ext[0] != '\0') {
-						override_file_ext(f_path, f_path, ff->data.file_ext);
-					}
-
 					/* make sure this is not a subdirectoy */
 					f_pdir = opendir(f_path);
-					if (f_pdir != NULL)
+					if (f_pdir != NULL) {
 						closedir(f_pdir);
+					}
 					else if (file_access(f_path, FILE_EXIST) != -1 &&
-						stat(f_path, &f_stats) == 0 && f_stats.st_size) {
+						stat(f_path, &f_stats) == 0 && f_stats.st_size &&
+						matching_file_ext(f_path, ff->data.file_ext) == 0) {
 						/* found first file in directory */
 						ff->name = ffd->d_name;
 						ff->size = f_stats.st_size;
@@ -716,17 +713,23 @@ int findfile_first(char *path, FIND_FILE *ff)
 			stat(path, &f_stats) == 0 && f_stats.st_size) {
 			/* found a file */
 			file_splitpath(path, drive, dir, fname, ext);
-			strcpy(ff->data.file_spec, fname);
-			strcat(ff->data.file_spec, ext);
-			ff->name = ff->data.file_spec;
-			ff->size = f_stats.st_size;
-			ff->phandle = NULL;
-			return 0;
+
+			/* searching for specific file.ext? */
+			if (ff->data.file_ext[0] == '\0' ||
+                            strcmp(ext, ff->data.file_ext) == 0) {
+				strcpy(ff->data.file_spec, fname);
+				strcat(ff->data.file_spec, ext);
+				ff->name = ff->data.file_spec;
+				ff->size = f_stats.st_size;
+				ff->phandle = NULL;
+				return 0;
+			}
 		}
 	}
 
 	ff->phandle = NULL;
 	return -1;
+
 #else	/* _MSC_VER */
 	struct _finddata_t *ffd;
 	intptr_t hFind;
@@ -783,17 +786,13 @@ int findfile_next(FIND_FILE *ff)
 					strcpy(f_path, ff->data.dir_path);
 					strcat(f_path, ffd->d_name);
 
-					/* searching for specific file.ext? */
-					if (ff->data.file_ext[0] != '\0') {
-						override_file_ext(f_path, f_path, ff->data.file_ext);
-					}
-
 					/* make sure this is not a subdirectoy */
 					f_pdir = opendir(f_path);
 					if (f_pdir != NULL)
 						closedir(f_pdir);
 					else if (file_access(f_path, FILE_EXIST) != -1 &&	
-						stat(f_path, &f_stats) == 0 && f_stats.st_size) {
+						stat(f_path, &f_stats) == 0 && f_stats.st_size &&
+						matching_file_ext(f_path, ff->data.file_ext) == 0) {
 						/* found next file in directory */
 						ff->name = ffd->d_name;
 						ff->size = f_stats.st_size;
@@ -955,16 +954,40 @@ char *file_fullpath(
 	)
 {
 #ifdef __GNUC__
-	char *path;
-	if (absPath)
+	char path[_MAX_PATH];
+	char *retPath = NULL;
+	wordexp_t exp;
+
+	if (absPath) {
+		if (relPath[0] == '~') {
+			wordexp("~", &exp, 0);
+			strcpy(path, exp.we_wordv[0]);
+			strcat(path, &relPath[1]);
+		}
+		else {
+			strcpy(path, relPath);
+		}
+		to_unix_path((char *)path);
+
 		*absPath = '\0';
-	path = realpath(to_unix_path((char *)relPath), absPath);
-	if (path == NULL && errno == ENOENT && *absPath != '\0')
-		path = absPath;
-	return path;
+		retPath = realpath(path, absPath);
+		if (retPath == NULL && errno == ENOENT && *absPath != '\0')
+			retPath = absPath;
+	}
+	return retPath;
 #else	/* _MSC_VER */
 	return _fullpath(absPath, relPath, _MAX_PATH);
 #endif
+}
+
+int matching_file_ext(char *cur_path, char *new_ext)
+{
+	if (new_ext[0] != '\0') {
+		file_splitpath(cur_path, drive, dir, fname, ext);
+		return strcmp(ext, new_ext);
+	}
+
+	return 0;
 }
 
 void getfullpath(char *fullpath, char *dirpath, char *filespec)
@@ -975,34 +998,27 @@ void getfullpath(char *fullpath, char *dirpath, char *filespec)
 	strcat(fullpath, filespec);
 }
 
-void override_file_ext(char *cur_path, char *new_path, char *new_ext)
-{
-	file_splitpath(cur_path, drive, dir, fname, ext);
-	strcpy(new_path, drive);
-	strcat(new_path, dir);
-	strcat(new_path, fname);
-	strcat(new_path, new_ext);
-}
-
 void file_splitpath(
-	const char* path,
-	char* drv,
-	char* dir,
-	char* name,
-	char* ext
+	const char *path,
+	char *drv,
+	char *dir,
+	char *name,
+	char *ext
 	)
 {
 	const char* end; /* end of processed string */
 	const char* p;   /* search pointer */
 	const char* s;   /* copy pointer */
+	int i;
 
 	/* extract drive name */
 	if (path[0] && path[1] == ':') {
 		if (drv) {
-			*drv++ = *path++;
-			*drv++ = *path++;
-			*drv = '\0';
+			drv[0] = path[0];
+			drv[1] = path[1];
+			drv[2] = '\0';
 		}
+		path += 2;
 	}
 	else if (drv) {
 		*drv = '\0';
@@ -1019,8 +1035,12 @@ void file_splitpath(
 	}
 
 	if (ext) {
-		for (s = end; (*ext = *s++);)
-			ext++;
+		i = 0;
+		s = end;
+		while (*s != '\0') {
+			ext[i++] = *s++;
+		}
+		ext[i] = '\0';
 	}
 
 	/* search for end of directory name */
@@ -1032,15 +1052,21 @@ void file_splitpath(
 	}
 
 	if (name) {
-		for (s = p; s < end;)
-			*name++ = *s++;
-
-		*name = '\0';
+		i = 0;
+		s = p;
+		while (*s != '\0' && s < end) {
+			name[i++] = *s++;
+		}
+		name[i] = '\0';
 	}
 
 	if (dir) {
-		for (s = path; s < p;)
-			*dir++ = *s++;
+		i = 0;
+		s = path;
+		while (s < p) {
+			dir[i++] = *s++;
+		}
+		dir[i] = '\0';
 	}
 }
 
@@ -1050,7 +1076,7 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.40\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.41\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");

@@ -43,6 +43,7 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>		/* access() */
 #include <dirent.h>		/* opendir() */
 #include <limits.h>		/* realpath() */
+#include <wordexp.h>		/* wordexp() */
 #include <errno.h>
 #include <termios.h>
 #else
@@ -194,7 +195,7 @@ int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext);
 int get_output_path(char *out_path, char *out_file, char *out_ext);
 
 void getfullpath(char *fullpath, char *dirpath, char *name);
-void override_file_ext(char *cur_path, char *new_path, char *new_ext);
+int matching_file_ext(char *cur_path, char *new_ext);
 int exists_as_directory(char *path);
 void terminate_directory(char *path);
 
