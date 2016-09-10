@@ -97,6 +97,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 			strcat(clone_file_path, fname);
 			strcat(clone_file_path, pout->ext);
 			file_fullpath(outpath, clone_file_path);
+			outlength = 0;
 			fout = NULL;
 		}
 
@@ -893,7 +894,7 @@ void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
 	if (entries == 0 && *pname != '\0') {
 		printf("No match found for name[ %s ], in file [ %s ]\n", pname, inpath);
 	}
-	else if (entries > 1) {
+	else if (entries) {
 		printf("%ld directory entries found.\n", entries);
 	}
 }
