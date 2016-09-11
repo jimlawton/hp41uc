@@ -39,11 +39,11 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include <io.h>
 #else
 #include <sys/io.h>
+#include <wordexp.h>	/* wordexp() */
 #endif
 #include <unistd.h>		/* access() */
 #include <dirent.h>		/* opendir() */
 #include <limits.h>		/* realpath() */
-#include <wordexp.h>		/* wordexp() */
 #include <errno.h>
 #include <termios.h>
 #else
