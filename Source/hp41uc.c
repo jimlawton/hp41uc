@@ -1083,7 +1083,7 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.41\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.42\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");

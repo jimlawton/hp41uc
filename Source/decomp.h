@@ -63,7 +63,7 @@ typedef enum {
 #define MAX_XROM_MODULES	32
 #define MAX_ROM_FUNCTIONS	64
 
-char *xrom17[] = {
+char *xrom17[] = {	/* PLOTTER 1A- */
 	"", "CLIPUU", "CSIZE", "CSIZEO", "DGTIZE", "DRAW", "FRAME", "GCLEAR",
 	"IDRAW", "IMOVE", "IPLOT", "LABEL", "LDIR", "LIMIT", "LOCATD", "LOCATE",
 	"LORG", "LTYPE", "LTYPEO", "LXAXIS", "LYAXIS", "MOVE", "PEN", "PENDN",
@@ -71,13 +71,13 @@ char *xrom17[] = {
 	"SETUU", "TICLEN", "UNCLIP", "WHERE", "XAXIS", "XAXISO", "YAXIS", "YAXISO",
 };
 
-char *xrom18[] = {
+char *xrom18[] = {	/* PLOTTER 2A- */
 	"", "PCLBUF", "PDIR", "PRCL", "NEWPLOT", "REPLOT", "PLINIT", "PLTUXY",
 	"PLANOT", "Y?", "X?", "BC", "BCA", "BCAA", "BCCKSM", "BCO",
 	"BCP", "BCREGX", "BCSIZE", "BCX", "BCXS",
 };
 
-char *xrom22[] = {
+char *xrom22[] = {	/* -HP-IL DEV */
 	"", "A-BUF", "A=BUF?", "A=BUFX?", "AAD", "AAU", "AIPT", "BSIZE?",
 	"BSIZEX", "BUF-AX", "BUF-RGX", "BUF-XA", "BUF-XB", "CF33", "CMD", "DDL",
 	"DDT", "FRAV?", "FRNS?", "GET", "GTL", "IDY", "IFCR?", "IFC",
@@ -88,7 +88,7 @@ char *xrom22[] = {
 	"UNT", "WFRM", "WREG", "X-BUF", "X=BUF?", "X<>FLAG",
 };
 
-char *xrom23[] = {
+char *xrom23[] = {	/* -X MASS 1A, -X EXT FCN, -X CTL FNS, -ADV CTL FN */
 	"", "COPYFL", "DIRX", "FLLENG", "FLTYPE", "MCOPY", "MCOPYPV", "MVERIFY",
 	"", "ALENGIO", "ANUNDEL", "ATOXL", "ATOXR", "ATOXX", "XTOAL", "XTOAR",
 	"X<>FIO", "YTOAX", "", "AID", "CLRDEV", "CLRLOOP", "DEVL", "DEVT",
@@ -99,13 +99,13 @@ char *xrom23[] = {
 	"DDL", "DDT", "LAD", "SEND", "TAD", "UNL", "UNT",
 };
 
-char *xrom24[] = {
+char *xrom24[] = {	/* -HP-IL DEV */
 	"", "AND", "ASIZE?", "A-XL", "A-XR", "A-XX", "BININ", "BINVIEW",
 	"BIT?", "HEXIN", "HEXVIEW", "NOT", "OR", "OCTIN", "OCTVIEW", "ROMCHKX",
 	"ROTXY", "XOR", "X-AL", "X-AR", "Y-AX",
 };
 
-char *xrom25[] = {
+char *xrom25[] = {	/* -EXT FCN 2D, -CX EXT FCN */
 	"", "ALENG", "ANUM", "APPCHR", "APPREC", "ARCLREC", "AROT", "ATOX",
 	"CLFL", "CLKEYS", "CRFLAS", "CRFLD", "DELCHR", "DELREC", "EMDIR", "FLSIZE",
 	"GETAS", "GETKEY", "GETP", "GETR", "GETREC", "GETRX", "GETSUB", "GETX",
@@ -116,7 +116,7 @@ char *xrom25[] = {
 	"SREG?", "X=NN?", "X#NN?", "X<NN?", "X<=NN?", "X>NN?", "X>=NN?",
 };
 
-char *xrom26[] = {
+char *xrom26[] = {	/* -TIME 2C, -CX TIME */
 	"", "ADATE", "ALMCAT", "ALMNOW", "ATIME", "ATIME24", "CLK12", "CLK24",
 	"CLKT", "CLKTD", "CLOCK", "CORRECT", "DATE", "DATE+", "DDAYS", "DMY",
 	"DOW", "MDY", "RCLAF", "RCLSW", "RUNSW", "SETAF", "SETDATE", "SETIME",
@@ -124,11 +124,11 @@ char *xrom26[] = {
 	"CLALMX", "CLRALMS", "RCLALM", "SWPT",
 };
 
-char *xrom27[] = {
+char *xrom27[] = {	/* -WAND 1F */
 	"", "WNDDTA", "WNDDTX", "WNDLNK", "WNDSUB", "WNDSCN", "WNDTST",
 };
 
-char *xrom28[] = {
+char *xrom28[] = {	/* -MASS ST 1H, -CTL FNS */
 	"", "CREATE", "DIR", "", "PURGE", "READA", "READK", "READP",
 	"READR", "READRX", "READS", "READSUB", "RENAME", "SEC", "SEEKR", "UNSEC",
 	"VERIFY", "WRTA", "WRTK", "WRTP", "WRTPV", "WRTR", "WRTRX", "WRTS",
@@ -137,11 +137,19 @@ char *xrom28[] = {
 	"STOPIO", "TRIGGER",
 };
 
-char *xrom29[] = {
+char *xrom29[] = {	/* -PRINTER 2E */
 	"", "ACA", "ACCHR", "ACCOL", "ACSPEC", "ACX", "BLDSPEC", "",
 	"PRA", "PRAXIS", "PRBUF", "PRFLAGS", "PRKEYS", "", "PRPLOT", "PRPLOTP",
 	"PRREG", "PRREGX", "PRS", "PRSTK", "PRX", "REGPLOT", "SKPCHR", "SKPCOL",
 	"STKPLOT", "FMT",
+};
+
+char *xrom30[] = {	/* CARD RDR 1E */
+	"", "MRG", "RDTA", "RDTAX", "RSUB", "VER",	"WALL", "WDTA",
+	"WDTAX", "WPRV", "WSTS", "7CLREG", "7DSP0",	"7DSP1", "7DSP2", "7DSP3",
+	"7DSP4", "7DSP5", "7DSP6", "7DSP7", "7DSP8", "7DSP9", "7DSPI", "7DSZ",
+	"7DSZI", "7ENG", "7FIX", "7GSBI", "7GTOI", "7ISZ", "7ISZI", "7P<>S",
+	"7PRREG", "7PRSTK", "7PRTX", "7RCL", "7SCI",
 };
 
 typedef struct {
@@ -161,6 +169,7 @@ XROM_DECOMP xrom_list[] = {
 	{ 27, 7, xrom27 },
 	{ 28, 42, xrom28 },
 	{ 29, 26, xrom29 },
+	{ 30, 37, xrom30 },
 };
 
 char pKey[] = " Key: rc";

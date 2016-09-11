@@ -1,5 +1,5 @@
 HP41UC - User-Code Utility for HP-41 Calculators
-Version 2.41 - September 10, 2016
+Version 2.42 - September 11, 2016
 Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
 
 Contributed under: GNU General Public License, Version 3.
