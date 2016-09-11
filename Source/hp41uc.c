@@ -954,8 +954,15 @@ char *file_fullpath(
 	)
 {
 #ifdef __GNUC__
-	char path[_MAX_PATH];
 	char *retPath = NULL;
+#ifdef __DJGPP__
+		*absPath = '\0';
+		retPath = realpath(to_unix_path((char *)relPath), absPath);
+		if (retPath == NULL && errno == ENOENT && *absPath != '\0')
+			retPath = absPath;
+	}
+#else
+	char path[_MAX_PATH];
 	wordexp_t exp;
 
 	if (absPath) {
@@ -967,13 +974,13 @@ char *file_fullpath(
 		else {
 			strcpy(path, relPath);
 		}
-		to_unix_path((char *)path);
 
 		*absPath = '\0';
-		retPath = realpath(path, absPath);
+		retPath = realpath(to_unix_path((char *)path), absPath);
 		if (retPath == NULL && errno == ENOENT && *absPath != '\0')
 			retPath = absPath;
 	}
+#endif
 	return retPath;
 #else	/* _MSC_VER */
 	return _fullpath(absPath, relPath, _MAX_PATH);
