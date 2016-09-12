@@ -956,6 +956,7 @@ char *file_fullpath(
 #ifdef __GNUC__
 	char *retPath = NULL;
 #ifdef __DJGPP__
+	if (absPath) {
 		*absPath = '\0';
 		retPath = realpath(to_unix_path((char *)relPath), absPath);
 		if (retPath == NULL && errno == ENOENT && *absPath != '\0')
