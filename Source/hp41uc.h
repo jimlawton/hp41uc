@@ -207,6 +207,8 @@ void barcode_init(void);
 void barcode(char *infile, char *outfile, char *title);
 
 void decompile_init(void);
+void decompile_xrom_all(int state);
+void decompile_xrom_one(int id, int state);
 int decompile(unsigned char *out_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend);
@@ -314,8 +316,6 @@ extern int line_numbers;
 extern int text_append;
 extern int raw_checksum;
 extern int force_global;
-extern int xrom_count;
-extern int decomp_xrom[32];
 
 extern char ascii[80];
 extern unsigned char buf1_16[16];
@@ -373,8 +373,4 @@ extern char *alt_postfix102_111[];
 
 extern char *alt_postfix117_122[];
 
-extern char *xrom23[];
-extern char *xrom25[];
-extern char *xrom26[];
-extern char *xrom28[];
 

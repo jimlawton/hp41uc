@@ -27,6 +27,10 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 
 void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name)
 {
+	/* use static on large arrays to avoid growing the stack */
+	static char clone_dir_path[_MAX_PATH];
+	static char clone_file_path[_MAX_PATH];
+	int clone_input = 0;
 	char pname[11];
 	char p41name[11];
 	long inlength;
@@ -35,9 +39,6 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 	long dirblks, startblk;
 	FILE *fin, *fout = NULL;
 	FIND_FILE findfile;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
 
 	/* get input file(s) */
 	if ((files = find_input_files(&findfile, dirpath, infile, pin->ext)) == 0) {

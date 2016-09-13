@@ -42,7 +42,11 @@ void barcode_init(void)
 
 void barcode(char *infile, char *outfile, char *title)
 {
+	/* use static on large arrays to avoid growing the stack */
+	static char clone_dir_path[_MAX_PATH];
+	static char clone_file_path[_MAX_PATH];
 	char bc_ext[_MAX_EXT];
+	int clone_input = 0;
 	int i, j, k;
 	long blk, reg;
 	long prog_pos;
@@ -62,9 +66,6 @@ void barcode(char *infile, char *outfile, char *title)
 	int checksum;
 	int row = 1;
 	DECODE_FLAG flag;
-	char clone_dir_path[_MAX_PATH];
-	char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
 
 	/* init strings */
 	bc_title = title;

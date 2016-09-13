@@ -36,9 +36,7 @@ int main(int argc, char *argv[])
 	char *endptr;
 
 	/* decmpile XROMs by default */
-	xrom_count = sizeof(decomp_xrom) / sizeof(int);
-	for (xrom_id = 0; xrom_id < xrom_count; ++xrom_id)
-		decomp_xrom[xrom_id] = 1;
+	decompile_xrom_all(1);
 
 	/* parser */
 	for (h = 0, i = 1; i < argc && !h; ++i) {
@@ -88,13 +86,11 @@ int main(int argc, char *argv[])
 		else if (_strnicmp(argv[i], "-x", 2) == 0 ||
 			_strnicmp(argv[i], "/x", 2) == 0) {
 			if (strlen(argv[i]) == 2) {
-				for (xrom_id = 0; xrom_id < xrom_count; ++xrom_id)
-					decomp_xrom[xrom_id] = 0;
+				decompile_xrom_all(0);
 			}
 			else {
 				xrom_id = (int)strtoul(&argv[i][2], &endptr, 10);
-				if (xrom_id && xrom_id < xrom_count)
-					decomp_xrom[xrom_id] = 0;
+				decompile_xrom_one(xrom_id, 0);
 			}
 		}
 		else if (k) {
@@ -439,7 +435,8 @@ int asciitohex(unsigned char *hex_buffer,
 
 int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext)
 {
-	char path[_MAX_PATH];
+	/* use static on large arrays to avoid growing the stack */
+	static char path[_MAX_PATH];
 	int files = 1;
 
 	/* valid input path? */
@@ -644,9 +641,10 @@ int findfile_first(char *path, FIND_FILE *ff)
 	struct dirent *ffd;
 	struct stat f_stats;
 	DIR *pdir, *f_pdir;
-	char f_path[_MAX_PATH];
-	char f_dir[_MAX_PATH];
 	int check_path_end = 0;
+	/* use static on large arrays to avoid growing the stack */
+	static char f_path[_MAX_PATH];
+	static char f_dir[_MAX_PATH];
 
 	if (ff == NULL)
 		return -1;
@@ -772,7 +770,8 @@ int findfile_next(FIND_FILE *ff)
 	struct dirent *ffd;
 	struct stat f_stats;
 	DIR *pdir, *f_pdir;
-	char f_path[_MAX_PATH];
+	/* use static on large arrays to avoid growing the stack */
+	static char f_path[_MAX_PATH];
 
 	if (ff != NULL) {
 		pdir = (DIR *)ff->phandle;
@@ -963,7 +962,8 @@ char *file_fullpath(
 			retPath = absPath;
 	}
 #else
-	char path[_MAX_PATH];
+	/* use static on large arrays to avoid growing the stack */
+	static char path[_MAX_PATH];
 	wordexp_t exp;
 
 	if (absPath) {
@@ -1084,7 +1084,7 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.42\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.43\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");

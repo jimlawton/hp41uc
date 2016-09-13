@@ -38,8 +38,6 @@ int line_numbers = 0;
 int text_append = 0;
 int force_global = 0;
 int raw_checksum = 1;
-int xrom_count;
-int decomp_xrom[32];
 
 char ascii[80];
 unsigned char buf1_16[16];
@@ -148,11 +146,10 @@ char *prefixB1_BF[] = {
 };
 
 char *prefixCE_CF[] = {
-
 	"X<> ", "LBL ",
 };
 
-char prefixXROM[] = "XROM xx,xx";
+char prefixXROM[] = "XROM mm,ff";
 
 char prefixGTO[] = "GTO ";
 

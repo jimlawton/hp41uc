@@ -26,6 +26,27 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include "hp41uc.h"
 #include "decomp.h"
 
+XROM_DECOMP xrom_list[] = {
+		{ 17, 40, xrom17 },
+		{ 18, 21, xrom18 },
+		{ 22, 62, xrom22 },
+		{ 23, 63, xrom23 },
+		{ 24, 21, xrom24 },
+		{ 25, 63, xrom25 },
+		{ 26, 36, xrom26 },
+		{ 27, 7, xrom27 },
+		{ 28, 42, xrom28 },
+		{ 29, 26, xrom29 },
+		{ 30, 37, xrom30 },
+};
+
+static int decomp_xrom[32] = { 0 };
+
+static char pKey[] = " Key: rc";
+static char psKey[] = " Key: -rc";
+static unsigned char synth_buffer[18];
+static unsigned char buffer6[6];
+
 static int end = 0;
 static int line = 1;
 static int numeric = 0;
@@ -51,6 +72,24 @@ void decompile_init(void)
 	seek_state = SEEK_BYTE1;
 }
 
+void decompile_xrom_all(int state)
+{
+	int count, id;
+
+	count = sizeof(decomp_xrom) / sizeof(int);
+	for (id = 0; id < count; ++id)
+		decomp_xrom[id] = state;
+}
+
+void decompile_xrom_one(int id, int state)
+{
+	int count;
+
+	count = sizeof(decomp_xrom) / sizeof(int);
+	if (id < count)
+		decomp_xrom[id] = state;
+}
+
 int decompile(unsigned char *pout_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend)
@@ -59,6 +98,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 	unsigned char c;
 	char **xrom;
 	int do_xrom;
+	int xrom_count;
 	int done = 0;
 
 	consumed = 0;
@@ -282,6 +322,8 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			m = (count << 2) + (c >> 6);
 			i = c & 0x3F;
 			j = sizeof(xrom_list) / sizeof(XROM_DECOMP);
+			xrom_count = sizeof(decomp_xrom) / sizeof(int);
+
 			for (k = 0, do_xrom = 0; k < j && do_xrom == 0; ++k) {
 				xrom = xrom_list[k].xrom;
 				if (m && m < xrom_count && decomp_xrom[m] &&
@@ -297,6 +339,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					}
 				}
 			}
+
 			if (do_xrom == 0 &&
 				m < MAX_XROM_MODULES &&
 				i < MAX_ROM_FUNCTIONS) {

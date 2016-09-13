@@ -63,6 +63,12 @@ typedef enum {
 #define MAX_XROM_MODULES	32
 #define MAX_ROM_FUNCTIONS	64
 
+typedef struct {
+	int module_id;
+	int functions;
+	char **xrom;
+} XROM_DECOMP;
+
 char *xrom17[] = {	/* PLOTTER 1A- */
 	"", "CLIPUU", "CSIZE", "CSIZEO", "DGTIZE", "DRAW", "FRAME", "GCLEAR",
 	"IDRAW", "IMOVE", "IPLOT", "LABEL", "LDIR", "LIMIT", "LOCATD", "LOCATE",
@@ -145,37 +151,24 @@ char *xrom29[] = {	/* -PRINTER 2E */
 };
 
 char *xrom30[] = {	/* CARD RDR 1E */
-	"", "MRG", "RDTA", "RDTAX", "RSUB", "VER",	"WALL", "WDTA",
-	"WDTAX", "WPRV", "WSTS", "7CLREG", "7DSP0",	"7DSP1", "7DSP2", "7DSP3",
+	"", "MRG", "RDTA", "RDTAX", "RSUB", "",	"", "WDTA",
+	"WDTAX", "", "WSTS", "7CLREG", "7DSP0",	"7DSP1", "7DSP2", "7DSP3",
 	"7DSP4", "7DSP5", "7DSP6", "7DSP7", "7DSP8", "7DSP9", "7DSPI", "7DSZ",
 	"7DSZI", "7ENG", "7FIX", "7GSBI", "7GTOI", "7ISZ", "7ISZI", "7P<>S",
 	"7PRREG", "7PRSTK", "7PRTX", "7RCL", "7SCI",
 };
 
-typedef struct {
-	int module_id;
-	int functions;
-	char **xrom;
-} XROM_DECOMP;
-
-XROM_DECOMP xrom_list[] = {
-	{ 17, 40, xrom17 },
-	{ 18, 21, xrom18 },
-	{ 22, 62, xrom22 },
-	{ 23, 63, xrom23 },
-	{ 24, 21, xrom24 },
-	{ 25, 63, xrom25 },
-	{ 26, 36, xrom26 },
-	{ 27, 7, xrom27 },
-	{ 28, 42, xrom28 },
-	{ 29, 26, xrom29 },
-	{ 30, 37, xrom30 },
-};
-
-char pKey[] = " Key: rc";
-char psKey[] = " Key: -rc";
-unsigned char synth_buffer[18];
-unsigned char buffer6[6];
+extern char *xrom17[];
+extern char *xrom18[];
+extern char *xrom22[];
+extern char *xrom23[];
+extern char *xrom24[];
+extern char *xrom25[];
+extern char *xrom26[];
+extern char *xrom27[];
+extern char *xrom28[];
+extern char *xrom29[];
+extern char *xrom30[];
 
 int copy_prefix(char *prefix, int out_size);
 int copy_prefix2(char *prefix1, char *prefix2, int out_size);
