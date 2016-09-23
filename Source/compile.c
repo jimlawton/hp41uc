@@ -30,19 +30,18 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_CODE 18
 #define MAX_LINE 128
 
-static int global_label = 0;
+static int global_label = HP41_FALSE;
 static int global_count = 0;
-static int global_end = 0;
+static int global_end = HP41_FALSE;
 
-static int fnumeric = 0;
+static int fnumeric = HP41_FALSE;
 
 static COMPILE_STATE state = COMPILE_SEEK_START_LINE;
 static int source_line = 0;
-static int line_end = 0;
 static int line_index = 0;
-static int last_block = 0;
+static int line_end = HP41_FALSE;
+static int last_block = HP41_FALSE;
 
-static int line_argc;
 static int code_count;
 static unsigned char *line_ptr;
 static unsigned char *line_argv[MAX_ARGS];
@@ -51,16 +50,15 @@ static unsigned char code_buffer[MAX_CODE];
 
 void compile_init(void)
 {
-	global_label = 0;
+	fnumeric = HP41_FALSE;
+	global_label = HP41_FALSE;
+	global_end = HP41_FALSE;
 	global_count = 0;
-	global_end = 0;
-
-	fnumeric = 0;
 
 	source_line = 0;
-	line_end = 0;
 	line_index = 0;
-	last_block = 0;
+	line_end = HP41_FALSE;
+	last_block = HP41_FALSE;
 	state = COMPILE_SEEK_START_LINE;
 }
 
@@ -69,22 +67,23 @@ int compile(unsigned char *out_buffer, int out_size,
 	COMPILE_FLAG *pflag, int *ppending, int *pend_count)
 {
 	COMPILE_FLAG flag;
-	int done = 0;
+	int done = HP41_FALSE;
 	int consumed = 0;
 	int produced = 0;
 	unsigned char c, *inp, *outp;
+	int line_argc;
 
 	flag = *pflag;
 	if (flag == COMPILE_FLAG_RESTART ||
 		flag == COMPILE_FLAG_RESTART_EOF) {
 		line_index = 0;
 		source_line = 0;
-		last_block = (flag == COMPILE_FLAG_RESTART_EOF) ? 1 : 0;
+		last_block = (flag == COMPILE_FLAG_RESTART_EOF);
 		flag = COMPILE_FLAG_NONE;
 		state = COMPILE_SEEK_START_LINE;
 	}
 	else if (flag == COMPILE_FLAG_EOF) {
-		last_block = 1;
+		last_block = HP41_TRUE;
 		flag = COMPILE_FLAG_NONE;
 	}
 
@@ -108,7 +107,7 @@ int compile(unsigned char *out_buffer, int out_size,
 			c = *inp++;
 			++consumed;
 			if (c == '\n' || c == '\f' || c == 0x1A) {
-				line_end = 1;
+				line_end = HP41_TRUE;
 			}
 			else if (c == '\r') {
 				state = COMPILE_SEEK_END_LINE;
@@ -129,13 +128,13 @@ int compile(unsigned char *out_buffer, int out_size,
 			c = *inp++;
 			++consumed;
 			if (c == '\n' || c == '\f' || c == 0x1A) {
-				line_end = 1;
+				line_end = HP41_TRUE;
 			}
 			else if (c != '\r') {
 				line_index = 0;
 				++source_line;
 				flag = COMPILE_FLAG_ERROR;
-				printf("Error: found[ %c ] expecting end-of-line character.\n", c);
+				printf("Compiler Error: found[ %c ] expecting end-of-line character.\n", c);
 				state = COMPILE_IGNORE_BAD_LINE;
 			}
 			break;
@@ -143,7 +142,7 @@ int compile(unsigned char *out_buffer, int out_size,
 		case COMPILE_LINE_OUTPUT:
 			/* got room in output buffer? */
 			if (produced + code_count > out_size)
-				done = 1;
+				done = HP41_TRUE;
 			else if (code_count) {
 				/* flush code buffer */
 				memcpy(outp, code_buffer, code_count);
@@ -152,12 +151,14 @@ int compile(unsigned char *out_buffer, int out_size,
 				code_count = 0;
 			}
 			else if (!global_end &&
-				(line_argc = get_line_args(line_argv, &line_ptr))) {
+				(line_argc = get_line_args(line_argv, &line_ptr, HP41_TRUE, MAX_ARGS))) {
 				if (line_argc == MAX_ARGS && strlen((char *)line_ptr)) {
-					printf("Error: too many arguments[");
+					printf("Compiler Error: too many arguments[");
 					for (line_argc = 0; line_argc < MAX_ARGS; ++line_argc)
 						printf(" %s", line_argv[line_argc]);
-					printf(" %s ]\n", line_ptr);
+					if (strlen((char *)line_ptr))
+						printf(" %s", line_ptr);
+					printf(" ]\n");
 					code_count = 0;
 				}
 				else {
@@ -201,21 +202,21 @@ int compile(unsigned char *out_buffer, int out_size,
 			line_ptr = line_buffer;
 			code_count = 0;
 			line_index = 0;
-			line_end = 0;
+			line_end = HP41_FALSE;
 			++source_line;
 			state = COMPILE_LINE_OUTPUT;
 		}
 
 		/* any errors? */
 		if (flag == COMPILE_FLAG_ERROR) {
-			done = 1;
+			done = HP41_TRUE;
 			printf("Compiler error on line %d.\n", source_line);
 		}
 
 		/* exhausted buffers? */
 		if (produced == out_size ||
 			(consumed == *pin_count && state != COMPILE_LINE_OUTPUT)) {
-			done = 1;
+			done = HP41_TRUE;
 		}
 
 	} while (!done);
@@ -227,74 +228,6 @@ int compile(unsigned char *out_buffer, int out_size,
 	return(produced);
 }
 
-
-int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr)
-{
-	unsigned char *pc;
-	int i, j, count, done;
-
-	count = 0;
-	pc = *line_ptr;
-	done = (*pc == '\0') ? 1 : 0;
-	while (!done) {
-		/* ignore leading spaces */
-		while (*pc == '\t' || *pc == 0x20)
-			++pc;
-
-		/* ignore comment line */
-		if (*pc == ';' ||
-			*pc == '#' ||
-			*pc == '\0') {
-			done = 1;
-		}
-		else {
-			/* get argument */
-			i = 0;
-			do {
-				/* consider quotes as a unit */
-				j = is_inquotes(&pc[i]);
-				i += j+1;
-
-				/* end of line? */
-				if (pc[i] == '\0') {
-					done = 2;
-				}
-				/* end of instruction? */
-				else if (pc[i] == ',') {
-					if (pc[i + 1] == '\t' ||
-						pc[i + 1] == 0x20) {
-						pc[i] = '\0';
-						done = 1;
-					}
-				}
-				/* end of argument? */
-				else if (pc[i] == '\t' ||
-					pc[i] == 0x20) {
-					pc[i] = '\0';
-				}
-			} while (pc[i] != '\0');
-
-			/* put argument in list */
-			line_argv[count++] = pc;
-
-			/* point to next argument */
-			pc += strlen((char *)pc);
-			if (done != 2)
-				++pc;
-
-			/* full list? */
-			if (count == MAX_ARGS) {
-				done = 1;
-			}
-		}
-	}
-
-	/* update line pointer */
-	*line_ptr = pc;
-
-	return(count);
-}
-
 #define MAX_NUMERIC     16
 #define MAX_DIGITS      10
 #define MAX_INT         8
@@ -302,11 +235,10 @@ int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr)
 
 #define MAX_ALPHA       15
 
-
 int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 {
 	int i;
-	int error = 0;
+	int error = HP41_OK;
 	int num_index = 0;
 	int num_decimal = 0;
 	int num_digits = 0;
@@ -319,7 +251,7 @@ int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 			if (buffer[i] == '+' ||
 				buffer[i] == '-') {
 				if (exp_sign || exp_digits)
-					error = 1;
+					error = HP41_ERROR;
 				else {
 					++exp_sign;
 					if (buffer[i] == '-') {
@@ -330,20 +262,20 @@ int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 			else if (buffer[i] >= '0' &&
 				buffer[i] <= '9') {
 				if (exp_digits == MAX_EXP)
-					error = 1;
+					error = HP41_ERROR;
 				else {
 					++exp_digits;
 					numeric[num_index++] = buffer[i];
 				}
 			}
 			else {
-				error = 1;
+				error = HP41_ERROR;
 			}
 		}
 		else if (buffer[i] >= '0' &&
 			buffer[i] <= '9') {
 			if (num_digits == MAX_DIGITS)
-				error = 1;
+				error = HP41_ERROR;
 			else {
 				++num_digits;
 				numeric[num_index++] = buffer[i];
@@ -352,7 +284,7 @@ int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 		else if (buffer[i] == '.' ||
 			buffer[i] == ',') {
 			if (num_decimal)
-				error = 1;
+				error = HP41_ERROR;
 			else {
 				++num_decimal;
 				numeric[num_index++] = '.';
@@ -387,25 +319,25 @@ int get_numeric_prefix(unsigned char *numeric, unsigned char *buffer)
 				}
 			}
 			else {
-				error = 1;
+				error = HP41_ERROR;
 			}
 		}
 		else {
-			error = 1;
+			error = HP41_ERROR;
 		}
 	}
 
 	/* terminate string */
 	numeric[num_index] = '\0';
 
-	return(!error && strlen((char *)numeric));
+	return(error == HP41_OK && strlen((char *)numeric));
 }
-
 
 int get_text_prefix(unsigned char *text, unsigned char *buffer, int *pcount)
 {
 	int i, j, k;
-	int error = 1, istext = 1;
+	int istext = HP41_TRUE;
+	int error = HP41_ERROR;
 	unsigned char lbuffer[MAX_LINE];
 
 	/* get start-quote */
@@ -436,7 +368,7 @@ int get_text_prefix(unsigned char *text, unsigned char *buffer, int *pcount)
 					--j;
 				}
 				else if (!is_text(lbuffer)) {
-					istext = 0;
+					istext = HP41_FALSE;
 				}
 			}
 
@@ -444,13 +376,13 @@ int get_text_prefix(unsigned char *text, unsigned char *buffer, int *pcount)
 			if (istext) {
 				if (parse_text(text, &lbuffer[j + 1], pcount)) {
 					text[*pcount] = '\0';
-					error = 0;
+					error = HP41_OK;
 				}
 			}
 		}
 	}
 
-	return(!error);
+	return(error == HP41_OK);
 }
 
 int get_alpha_postfix(unsigned char *alpha, unsigned char *buffer)
@@ -469,13 +401,12 @@ int get_alpha_postfix(unsigned char *alpha, unsigned char *buffer)
 		/* copy alpha string after start-quote */
 		if (strlen((char *)&lbuffer[1]) <= MAX_ALPHA) {
 			strcpy((char *)alpha, (char *)&lbuffer[1]);
-			return(1);
+			return HP41_TRUE;
 		}
 	}
 
-	return(0);
+	return HP41_FALSE;
 }
-
 
 int compile_num(unsigned char *code, unsigned char *num)
 {
@@ -497,7 +428,6 @@ int compile_num(unsigned char *code, unsigned char *num)
 	return(count);
 }
 
-
 int compile_text(unsigned char *code, unsigned char *text, int count)
 {
 	/* TEXT0..15 */
@@ -508,12 +438,9 @@ int compile_text(unsigned char *code, unsigned char *text, int count)
 	return(count + 1);
 }
 
-
 int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alpha)
 {
-	int i, j;
-	int local, count;
-	unsigned char mm, ff;
+	int local, count, codes;
 	unsigned char lbuffer[MAX_LINE];
 
 	strcpy((char *)lbuffer, (char *)alpha);
@@ -524,7 +451,7 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	local = is_local_label((char *)alpha);
 
 	/* LBL "alpha" */
-	if (_stricmp((char *)prefix, "LBL") == 0) {
+	if (_stricmp((char *)prefix, "LBL") == HP41_OK) {
 		if (strlen((char *)alpha) >= MAX_ALPHA) {
 			printf("Error: alpha (global) postfix[ %s \"%s\" ] too long.\n",
 				prefix, alpha);
@@ -539,7 +466,7 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 				memcpy(&code[4], alpha, count);
 
 			/* set LABEL flag */
-			global_label = 1;
+			global_label = HP41_TRUE;
 			global_count = 0;
 			return(count + 4);
 		}
@@ -551,8 +478,8 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	}
 
 	/*  GTO "alpha" */
-	if (_stricmp((char *)prefix, "GTO") == 0 ||
-		_stricmp((char *)prefix, "GOTO") == 0) {
+	if (_stricmp((char *)prefix, "GTO") == HP41_OK ||
+		_stricmp((char *)prefix, "GOTO") == HP41_OK) {
 		if (force_global || !local) {
 			code[0] = 0x1D;
 			code[1] = 0xF0 + count;
@@ -569,7 +496,7 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	}
 
 	/*  XEQ "alpha" */
-	if (_stricmp((char *)prefix, "XEQ") == 0) {
+	if (_stricmp((char *)prefix, "XEQ") == HP41_OK) {
 		if (force_global || !local) {
 			code[0] = 0x1E;
 			code[1] = 0xF0 + count;
@@ -586,7 +513,7 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	}
 
 	/*  W "alpha" */
-	if (_stricmp((char *)prefix, "W") == 0) {
+	if (_stricmp((char *)prefix, "W") == HP41_OK) {
 		code[0] = 0x1F;
 		code[1] = 0xF0 + count;
 		if (count)
@@ -595,17 +522,10 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	}
 
 	/* XROM "alpha" */
-	if (_stricmp((char *)prefix, "XROM") == 0) {
-		j = sizeof(xrom_fcn) / sizeof(XROM);
-		for (i = 0; i < j; ++i) {
-			if (_stricmp((char *)alpha, xrom_fcn[i].prefix) == 0) {
-				mm = (unsigned char)xrom_fcn[i].code[0];
-				ff = (unsigned char)xrom_fcn[i].code[1];
-				code[0] = 0xA0 + (mm >> 2);
-				code[1] = ((mm & 0x03) << 6) + ff;
-				return(2);
-			}
-		}
+	if (_stricmp((char *)prefix, "XROM") == HP41_OK) {
+		codes = 0;
+		if (compile_xrom((char *)alpha, code, &codes) == HP41_OK)
+			return codes;
 
 		printf("Error: unrecognized alpha postfix[ %s \"%s\" ], try: [ XROM mm,ff ]\n",
 			prefix, alpha);
@@ -616,38 +536,76 @@ int compile_alpha(unsigned char *code, unsigned char *prefix, unsigned char *alp
 	return(0);
 }
 
+int compile_xrom(char *function, unsigned char *code_buffer, int *codes)
+{
+	unsigned char mm, ff;
+	int i;
+
+	/* supported XROM? */
+	for (i = 0; i < internal_xrom_entries; ++i) {
+		if (_stricmp(function, internal_xrom_table[i].function_name) == HP41_OK) {
+			mm = (unsigned char)internal_xrom_table[i].module_id;
+			if (is_enable_internal_xrom(mm)) {
+				ff = (unsigned char)internal_xrom_table[i].function_id;
+				code_buffer[0] = 0xA0 + (mm >> 2);
+				code_buffer[1] = ((mm & 0x03) << 6) + ff;
+				*codes = 2;
+				return HP41_OK;
+			}
+		}
+	}
+
+	/* imported XROM? */
+	for (i = 0; i < external_xrom_entries; ++i) {
+		if (_stricmp(function, external_xrom_table[i].function_name) == HP41_OK) {
+			mm = (unsigned char)external_xrom_table[i].module_id;
+			ff = (unsigned char)external_xrom_table[i].function_id;
+			code_buffer[0] = 0xA0 + (mm >> 2);
+			code_buffer[1] = ((mm & 0x03) << 6) + ff;
+			*codes = 2;
+			return HP41_OK;
+		}
+	}
+
+	/* excluded XROM? */
+	for (i = 0; i < internal_xrom_entries; ++i) {
+		if (_stricmp(function, internal_xrom_table[i].function_name) == HP41_OK) {
+			mm = (unsigned char)internal_xrom_table[i].module_id;
+			if (is_enable_internal_xrom(mm) == HP41_FALSE) {
+				printf("Error: \"%s\" function found in excluded XROM[ %d ], try: [ XROM mm,ff ]\n",
+					function, mm);
+				*codes = 0;
+				return HP41_OK;
+			}
+		}
+	}
+
+	/* no match found! */
+	return HP41_ERROR;
+}
 
 int compile_arg1(unsigned char *code, unsigned char *prefix)
 {
-	int i, j;
-	unsigned char mm, ff;
+	int i, codes;
 
 	/* .END. */
-	if (_stricmp((char *)prefix, "END") == 0 ||
-		_stricmp((char *)prefix, ".END.") == 0) {
+	if (_stricmp((char *)prefix, "END") == HP41_OK ||
+		_stricmp((char *)prefix, ".END.") == HP41_OK) {
 		compile_end(code, global_count);
 
 		/* set .END. flag */
-		global_end = 1;
+		global_end = HP41_TRUE;
 		return(3);
 	}
 
 	/* XROM functions */
-	j = sizeof(xrom_fcn) / sizeof(XROM);
-	for (i = 0; i < j; ++i) {
-		if (_stricmp((char *)prefix, xrom_fcn[i].prefix) == 0) {
-			mm = (unsigned char)xrom_fcn[i].code[0];
-			ff = (unsigned char)xrom_fcn[i].code[1];
-			code[0] = 0xA0 + (mm >> 2);
-			code[1] = ((mm & 0x03) << 6) + ff;
-			return(2);
-		}
-	}
+	codes = 0;
+	if (compile_xrom((char *)prefix, code, &codes) == HP41_OK)
+		return codes;
 
 	/* alternate-form functions */
-	j = sizeof(alt_fcn1) / sizeof(FCN);
-	for (i = 0; i < j; ++i) {
-		if (_stricmp((char *)prefix, alt_fcn1[i].prefix) == 0) {
+	for (i = 0; i < sizeof(alt_fcn1) / sizeof(FCN); ++i) {
+		if (_stricmp((char *)prefix, alt_fcn1[i].prefix) == HP41_OK) {
 			code[0] = (unsigned char)alt_fcn1[i].code;
 			return(1);
 		}
@@ -655,7 +613,7 @@ int compile_arg1(unsigned char *code, unsigned char *prefix)
 
 	/* single-byte functions */
 	for (i = 0x40; i <= 0x8F; ++i) {
-		if (_stricmp((char *)prefix, (char *)single20_8F[i - 0x20]) == 0) {
+		if (_stricmp((char *)prefix, (char *)single20_8F[i - 0x20]) == HP41_OK) {
 			code[0] = i;
 			return(1);
 		}
@@ -666,7 +624,6 @@ int compile_arg1(unsigned char *code, unsigned char *prefix)
 		prefix);
 	return(0);
 }
-
 
 int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *postfix)
 {
@@ -680,7 +637,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 	unsigned char *ppostfix = postfix;
 
 	/* XROM mm,ff */
-	if (_stricmp((char *)prefix, "XROM") == 0) {
+	if (_stricmp((char *)prefix, "XROM") == HP41_OK) {
 		if ((pf = (unsigned char *)strchr((char *)postfix, ','))) {
 			*pf++ = '\0';
 			pm = postfix;
@@ -725,7 +682,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 		/* LBL 00..14 */
 		for (i = 0x01; i <= 0x0F; ++i) {
 			j = i - 0x01;
-			if (_stricmp((char *)lbuffer, (char *)single01_1C[j]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)single01_1C[j]) == HP41_OK) {
 				code[0] = i;
 				return(1);
 			}
@@ -734,7 +691,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 		/* RCL 00..15, STO 00..15 */
 		for (i = 0x20; i <= 0x3F; ++i) {
 			j = i - 0x20;
-			if (_stricmp((char *)lbuffer, (char *)single20_8F[j]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)single20_8F[j]) == HP41_OK) {
 				code[0] = i;
 				return(1);
 			}
@@ -743,7 +700,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 		/* GTO 00..14 */
 		for (i = 0xB1; i <= 0xBF; ++i) {
 			j = i - 0xB1;
-			if (_stricmp((char *)lbuffer, (char *)prefixB1_BF[j]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)prefixB1_BF[j]) == HP41_OK) {
 				code[0] = i;
 				code[1] = 0x00;
 				return(2);
@@ -763,7 +720,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			/* RCL __..TONE __ */
 			for (j = 0x90; j <= 0x9F; ++j) {
 				k = j - 0x90;
-				if (_stricmp((char *)lbuffer, (char *)prefix90_9F[k]) == 0) {
+				if (_stricmp((char *)lbuffer, (char *)prefix90_9F[k]) == HP41_OK) {
 					code[0] = j;
 					code[1] = i;
 					return(2);
@@ -773,7 +730,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			/* SF __..FC? __ */
 			for (j = 0xA8; j <= 0xAD; ++j) {
 				k = j - 0xA8;
-				if (_stricmp((char *)lbuffer, (char *)prefixA8_AD[k]) == 0) {
+				if (_stricmp((char *)lbuffer, (char *)prefixA8_AD[k]) == HP41_OK) {
 					code[0] = j;
 					code[1] = i;
 					return(2);
@@ -783,7 +740,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			/* X<> __..LBL __ */
 			for (j = 0xCE; j <= 0xCF; ++j) {
 				k = j - 0xCE;
-				if (_stricmp((char *)lbuffer, (char *)prefixCE_CF[k]) == 0) {
+				if (_stricmp((char *)lbuffer, (char *)prefixCE_CF[k]) == HP41_OK) {
 					code[0] = j;
 					code[1] = i;
 					return(2);
@@ -793,7 +750,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			/* alternate-form functions */
 			k = sizeof(alt_fcn2) / sizeof(FCN);
 			for (j = 0; j < k; ++j) {
-				if (_stricmp((char *)prefix, alt_fcn2[j].prefix) == 0) {
+				if (_stricmp((char *)prefix, alt_fcn2[j].prefix) == HP41_OK) {
 					code[0] = (unsigned char)alt_fcn2[j].code;
 					code[1] = i;
 					return(2);
@@ -804,8 +761,8 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			/* 3-byte functions */
 			/* */
 			/* GTO __ */
-			if (_stricmp((char *)prefix, "GTO") == 0 ||
-				_stricmp((char *)prefix, "GOTO") == 0) {
+			if (_stricmp((char *)prefix, "GTO") == HP41_OK ||
+				_stricmp((char *)prefix, "GOTO") == HP41_OK) {
 				code[0] = 0xD0;
 				code[1] = 0x00;
 				code[2] = i;
@@ -813,7 +770,7 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 			}
 
 			/* XEQ __ */
-			if (_stricmp((char *)prefix, "XEQ") == 0) {
+			if (_stricmp((char *)prefix, "XEQ") == HP41_OK) {
 				code[0] = 0xE0;
 				code[1] = 0x00;
 				code[2] = i;
@@ -825,7 +782,6 @@ int compile_arg2(unsigned char *code, unsigned char *prefix, unsigned char *post
 	printf("Error: unrecognized function[ %s %s ]\n", prefix, postfix);
 	return(0);
 }
-
 
 int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind, unsigned char *postfix)
 {
@@ -852,7 +808,7 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 		/* RCL IND __..TONE IND __ */
 		for (j = 0x90; j <= 0x9F; ++j) {
 			k = j - 0x90;
-			if (_stricmp((char *)lbuffer, (char *)prefix90_9F[k]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)prefix90_9F[k]) == HP41_OK) {
 				code[0] = j;
 				code[1] = i + 0x80;
 				return(2);
@@ -862,7 +818,7 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 		/* alternate-form IND functions */
 		k = sizeof(alt_fcn2) / sizeof(FCN);
 		for (j = 0; j < k; ++j) {
-			if (_stricmp((char *)prefix, alt_fcn2[j].prefix) == 0) {
+			if (_stricmp((char *)prefix, alt_fcn2[j].prefix) == HP41_OK) {
 				code[0] = (unsigned char)alt_fcn2[j].code;
 				code[1] = i + 0x80;
 				return(2);
@@ -872,7 +828,7 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 		/* SF IND __..FC? IND __ */
 		for (j = 0xA8; j <= 0xAD; ++j) {
 			k = j - 0xA8;
-			if (_stricmp((char *)lbuffer, (char *)prefixA8_AD[k]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)prefixA8_AD[k]) == HP41_OK) {
 				code[0] = j;
 				code[1] = i + 0x80;
 				return(2);
@@ -882,7 +838,7 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 		/* X<> IND __..LBL IND __ */
 		for (j = 0xCE; j <= 0xCF; ++j) {
 			k = j - 0xCE;
-			if (_stricmp((char *)lbuffer, (char *)prefixCE_CF[k]) == 0) {
+			if (_stricmp((char *)lbuffer, (char *)prefixCE_CF[k]) == HP41_OK) {
 				code[0] = j;
 				code[1] = i + 0x80;
 				return(2);
@@ -890,15 +846,15 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 		}
 
 		/* GTO IND __ */
-		if (_stricmp((char *)prefix, "GTO") == 0 ||
-			_stricmp((char *)prefix, "GOTO") == 0) {
+		if (_stricmp((char *)prefix, "GTO") == HP41_OK ||
+			_stricmp((char *)prefix, "GOTO") == HP41_OK) {
 			code[0] = 0xAE;
 			code[1] = i;
 			return(2);
 		}
 
 		/* XEQ IND __ */
-		if (_stricmp((char *)prefix, "XEQ") == 0) {
+		if (_stricmp((char *)prefix, "XEQ") == HP41_OK) {
 			code[0] = 0xAE;
 			code[1] = i + 0x80;
 			return(2);
@@ -910,7 +866,6 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 	return(0);
 }
 
-
 int compile_label(unsigned char *code, unsigned char *label, unsigned char *alpha, unsigned char *key)
 {
 	int asn, count;
@@ -918,7 +873,7 @@ int compile_label(unsigned char *code, unsigned char *label, unsigned char *alph
 	asn = get_key(key);
 	count = strlen((char *)alpha);
 	if (asn && count && count < MAX_ALPHA &&
-		_stricmp((char *)label, "LBL") == 0) {
+		_stricmp((char *)label, "LBL") == HP41_OK) {
 		code[0] = 0xC0;
 		code[1] = 0x00;
 		code[2] = 0xF1 + count;
@@ -936,7 +891,6 @@ int compile_label(unsigned char *code, unsigned char *label, unsigned char *alph
 
 	return(0);
 }
-
 
 void compile_end(unsigned char *buffer, int bytes)
 {
@@ -972,13 +926,12 @@ void compile_end(unsigned char *buffer, int bytes)
 	buffer[2] = 0x0D;
 }
 
-
 int is_postfix(unsigned char *postfix, int *pindex)
 {
 	int i, j;
 
 	for (i = 0; i <= 127; ++i) {
-		if (strcmp((char *)postfix, (char *)postfix00_7F[i]) == 0) {
+		if (strcmp((char *)postfix, (char *)postfix00_7F[i]) == HP41_OK) {
 			*pindex = i;
 			return(1);
 		}
@@ -986,39 +939,38 @@ int is_postfix(unsigned char *postfix, int *pindex)
 
 	/* case-insensitive: "F..R" */
 	for (i = 107; i <= 122; ++i) {
-		if (_stricmp((char *)postfix, (char *)postfix00_7F[i]) == 0) {
+		if (_stricmp((char *)postfix, (char *)postfix00_7F[i]) == HP41_OK) {
 			*pindex = i;
 			return(1);
 		}
 	}
 
 	for (i = 102, j = 0; i <= 111; ++i, ++j) {
-		if (strcmp((char *)postfix, (char *)alt_postfix102_111[j]) == 0) {
+		if (strcmp((char *)postfix, (char *)alt_postfix102_111[j]) == HP41_OK) {
 			*pindex = i;
 			return(1);
 		}
 	}
 
 	for (i = 117, j = 0; i <= 122; ++i, ++j) {
-		if (strcmp((char *)postfix, (char *)alt_postfix117_122[j]) == 0) {
+		if (strcmp((char *)postfix, (char *)alt_postfix117_122[j]) == HP41_OK) {
 			*pindex = i;
 			return(1);
 		}
 	}
 
-	if (strcmp((char *)postfix, "\xC3") == 0 ||
-		strcmp((char *)postfix, ">") == 0 ||
-		strcmp((char *)postfix, "|-") == 0 ||
-		strcmp((char *)postfix, "\\-") == 0 ||
-		strcmp((char *)postfix, ">-") == 0 ||
-		strcmp((char *)postfix, "->") == 0) {
+	if (strcmp((char *)postfix, "\xC3") == HP41_OK ||
+		strcmp((char *)postfix, ">") == HP41_OK ||
+		strcmp((char *)postfix, "|-") == HP41_OK ||
+		strcmp((char *)postfix, "\\-") == HP41_OK ||
+		strcmp((char *)postfix, ">-") == HP41_OK ||
+		strcmp((char *)postfix, "->") == HP41_OK) {
 		*pindex = 0x7A;
 		return(1);
 	}
 
 	return(0);
 }
-
 
 int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 {
@@ -1180,51 +1132,25 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 	return(n);
 }
 
-
-int is_inquotes(unsigned char *buffer)
-{
-	int i;
-
-	if (buffer[0] == '\"' || buffer[0] == '\'') {
-		for (i = 1; (size_t)i < strlen((char *)buffer); ++i) {
-			if (buffer[i] == buffer[0] &&
-				buffer[i - 1] != '\\') {
-				if (buffer[i + 1] == buffer[0])
-					++i;
-				else if (buffer[i + 1] == '\0' ||
-					buffer[i + 1] == '\t' ||
-					buffer[i + 1] == 0x20) {
-					return(i);
-				}
-			}
-		}
-	}
-
-	return(0);
-}
-
-
 int is_append(unsigned char *prefix)
 {
-	return(strcmp((char *)prefix, "\xC3") == 0 ||
-		strcmp((char *)prefix, ">") == 0 ||
-		strcmp((char *)prefix, "|-") == 0 ||
-		strcmp((char *)prefix, "\\-") == 0 ||
-		strcmp((char *)prefix, ">-") == 0 ||
-		strcmp((char *)prefix, "->") == 0 ||
-		_stricmp((char *)prefix, "APND") == 0 ||
-		_stricmp((char *)prefix, "APPND") == 0 ||
-		_stricmp((char *)prefix, "APPEND") == 0);
+	return(strcmp((char *)prefix, "\xC3") == HP41_OK ||
+		strcmp((char *)prefix, ">") == HP41_OK ||
+		strcmp((char *)prefix, "|-") == HP41_OK ||
+		strcmp((char *)prefix, "\\-") == HP41_OK ||
+		strcmp((char *)prefix, ">-") == HP41_OK ||
+		strcmp((char *)prefix, "->") == HP41_OK ||
+		_stricmp((char *)prefix, "APND") == HP41_OK ||
+		_stricmp((char *)prefix, "APPND") == HP41_OK ||
+		_stricmp((char *)prefix, "APPEND") == HP41_OK);
 }
-
 
 int is_text(unsigned char *prefix)
 {
-	return(_stricmp((char *)prefix, "T") == 0 ||
-		_stricmp((char *)prefix, "TXT") == 0 ||
-		_stricmp((char *)prefix, "TEXT") == 0);
+	return(_stricmp((char *)prefix, "T") == HP41_OK ||
+		_stricmp((char *)prefix, "TXT") == HP41_OK ||
+		_stricmp((char *)prefix, "TEXT") == HP41_OK);
 }
-
 
 int is_local_label(char *alpha)
 {
@@ -1232,21 +1158,20 @@ int is_local_label(char *alpha)
 
 	/* "A..J" */
 	for (i = 0x66; i <= 0x6F; ++i) {
-		if (strcmp(alpha, (char *)postfix00_7F[i]) == 0) {
+		if (strcmp(alpha, (char *)postfix00_7F[i]) == HP41_OK) {
 			return(i);
 		}
 	}
 
 	/* "a..e" */
 	for (i = 0x7B; i <= 0x7F; ++i) {
-		if (strcmp(alpha, (char *)postfix00_7F[i]) == 0) {
+		if (strcmp(alpha, (char *)postfix00_7F[i]) == HP41_OK) {
 			return(i);
 		}
 	}
 
 	return(0);
 }
-
 
 int get_key(unsigned char *key)
 {
@@ -1259,7 +1184,7 @@ int get_key(unsigned char *key)
 	if ((pkey = strchr((char *)lbuffer, ':'))) {
 		*pkey++ = '\0';
 		if (*lbuffer == '\0' ||
-			_stricmp((char *)lbuffer, "Key") == 0) {
+			_stricmp((char *)lbuffer, "Key") == HP41_OK) {
 			rc = strtol((char *)pkey, &stop, 10);
 
 			/* shift key? */
@@ -1298,7 +1223,6 @@ char get_xdigit(unsigned char xdigit)
 		return(toupper(xdigit) - 'A' + 10);
 }
 
-
 int compile_args(unsigned char *code_buffer,
 	int line_argc,
 	unsigned char *line_argv[])
@@ -1322,12 +1246,12 @@ int compile_args(unsigned char *code_buffer,
 				count = 1 + compile_num(&code_buffer[1], num_buffer);
 			}
 			else {
-				fnumeric = 1;
+				fnumeric = HP41_TRUE;
 				count = compile_num(code_buffer, num_buffer);
 			}
 		}
 		else {
-			fnumeric = 0;
+			fnumeric = HP41_FALSE;
 			if (get_text_prefix(text_buffer, line_argv[base + 0], &size)) {
 				count = compile_text(code_buffer, text_buffer, size);
 			}
@@ -1347,12 +1271,12 @@ int compile_args(unsigned char *code_buffer,
 				count = 1 + compile_num(&code_buffer[1], num_buffer);
 			}
 			else {
-				fnumeric = 1;
+				fnumeric = HP41_TRUE;
 				count = compile_num(code_buffer, num_buffer);
 			}
 		}
 		else {
-			fnumeric = 0;
+			fnumeric = HP41_FALSE;
 			if (get_text_prefix(text_buffer, lbuffer, &size)) {
 				count = compile_text(code_buffer, text_buffer, size);
 			}
@@ -1389,4 +1313,3 @@ int compile_args(unsigned char *code_buffer,
 
 	return(count);
 }
-

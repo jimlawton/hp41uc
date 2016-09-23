@@ -30,7 +30,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 	/* use static on large arrays to avoid growing the stack */
 	static char clone_dir_path[_MAX_PATH];
 	static char clone_file_path[_MAX_PATH];
-	int clone_input = 0;
+	int clone_input = HP41_FALSE;
 	char pname[11];
 	char p41name[11];
 	long inlength;
@@ -41,7 +41,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 	FIND_FILE findfile;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&findfile, dirpath, infile, pin->ext)) == 0) {
+	if ((files = find_input_files(&findfile, dirpath, infile, pin->ext)) == HP41_OK) {
 		goto convert_exit;
 	}
 	else if (files > 1 && pin->file_type == FILE_LIF) {
@@ -53,16 +53,16 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 	/* get output path */
 	if (outfile == NULL || *outfile == '\0') {
 		clone_dir_path[0] = '\0';
-		clone_input = 1;
+		clone_input = HP41_TRUE;
 	}
-	else if (get_output_path(outpath, outfile, pout->ext) != 0) {
+	else if (get_file_path(outpath, outfile, pout->ext) != HP41_OK) {
 		goto convert_exit;
 	}
 	/* outpath is a directory? */
-	else if (exists_as_directory(outpath) != -1) {
+	else if (exists_as_directory(outpath) != HP41_ERROR) {
 		strcpy(clone_dir_path, outpath);
 		terminate_directory(clone_dir_path);
-		clone_input = 1;
+		clone_input = HP41_TRUE;
 	}
 	/* outpath is a file */
 	else if (files > 1 && pout->file_type != FILE_LIF) {
@@ -103,7 +103,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 		}
 
 		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
+		if ((fin = open_input_ex(inpath, inlength, infile, outpath))) {
 			if (pin->file_type == FILE_LIF) {
 				/* read LIF header */
 				if ((dirblks = read_lif_hdr(fin, inpath, inlength))) {
@@ -162,7 +162,7 @@ void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char 
 			fclose(fin);
 		}
 		--files;
-	} while (fout && files && findfile_next(&findfile) == 0);
+	} while (fout && files && findfile_next(&findfile) == HP41_OK);
 
 convert_exit:
 	findfile_close(&findfile);
@@ -176,7 +176,7 @@ void p41dump(char *infile)
 	FIND_FILE p41file;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&p41file, dirpath, infile, p41.ext)) == 0) {
+	if ((files = find_input_files(&p41file, dirpath, infile, p41.ext)) == HP41_OK) {
 		goto p41dump_exit;
 	}
 
@@ -185,7 +185,7 @@ void p41dump(char *infile)
 		getfullpath(inpath, dirpath, p41file.name);
 
 		/* open input file */
-		if ((fin = open_input(inpath, p41file.size, infile, NULL))) {
+		if ((fin = open_input_ex(inpath, p41file.size, infile, NULL))) {
 			/* dump LIF directry */
 			printf("LIF directory listing[ %s ]\n", inpath);
 			dump_lif_dir(fin, inpath, 1, NULL);
@@ -194,7 +194,7 @@ void p41dump(char *infile)
 		}
 
 		--files;
-	} while (files && findfile_next(&p41file) == 0);
+	} while (files && findfile_next(&p41file) == HP41_OK);
 
 p41dump_exit:
 	findfile_close(&p41file);
@@ -209,7 +209,7 @@ void lifdump(char *infile, char *name)
 	FIND_FILE liffile;
 
 	/* get input file(s) */
-	if ((files = find_input_files(&liffile, dirpath, infile, lif.ext)) == 0) {
+	if ((files = find_input_files(&liffile, dirpath, infile, lif.ext)) == HP41_OK) {
 		goto lifdump_exit;
 	}
 
@@ -221,7 +221,7 @@ void lifdump(char *infile, char *name)
 		inlength = liffile.size;
 
 		/* open input file */
-		if ((fin = open_input(inpath, inlength, infile, outpath))) {
+		if ((fin = open_input_ex(inpath, inlength, infile, outpath))) {
 			/* read LIF header */
 			printf("LIF directory listing[ %s ]\n", inpath);
 			if ((dirblks = read_lif_hdr(fin, inpath, inlength))) {
@@ -233,7 +233,7 @@ void lifdump(char *infile, char *name)
 		}
 
 		--files;
-	} while (files && findfile_next(&liffile) == 0);
+	} while (files && findfile_next(&liffile) == HP41_OK);
 
 lifdump_exit:
 	findfile_close(&liffile);
@@ -407,7 +407,8 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 	/* copy blocks */
 	inblk = sizeof(buf1_256);
 	memset(buf1_256, 0, sizeof(buf1_256));
-	decompile_init();
+	if (outdtype == DATA_TXT)
+		decompile_init();
 	for (i = 0; i < blkcnt && inblk && inlength; ++i) {
 		/* less than a full block? */
 		if (inlength < sizeof(buf1_256))
@@ -523,7 +524,8 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 	/* copy blocks */
 	inblk = sizeof(buf_512);
 	memset(buf_512, 0, sizeof(buf_512));
-	decompile_init();
+	if (outdtype == DATA_TXT)
+		decompile_init();
 	for (i = 0; i < blkcnt && inblk && inlength; ++i) {
 		/* less than a full block? */
 		if (inlength < sizeof(buf_512))
@@ -1112,7 +1114,7 @@ long read_lif_hdr(FILE *fin, char *inpath, long size)
 		else
 			printf("13 ]: expected[ 00 ], found[ %02X ]\n", puc[1]);
 	}
-	else if (*(pus = (unsigned short *)&buf1_256[14]) != 0) {
+	else if (*(pus = (unsigned short *)&buf1_256[14]) != 0x00) {
 		puc = (unsigned char *)pus;
 		printf("Error: invalid filler at offset[ ");
 		if (puc[0] != 0x00)
@@ -1120,7 +1122,7 @@ long read_lif_hdr(FILE *fin, char *inpath, long size)
 		else if (puc[1] != 0x00)
 			printf("15 ]: expected[ 00 ], found[ %02X ]\n", puc[1]);
 	}
-	else if (*(pus = (unsigned short *)&buf1_256[22]) != 0) {
+	else if (*(pus = (unsigned short *)&buf1_256[22]) != 0x00) {
 		puc = (unsigned char *)pus;
 		printf("Error: invalid filler at offset[ ");
 		if (puc[0] != 0x00)
@@ -1128,11 +1130,11 @@ long read_lif_hdr(FILE *fin, char *inpath, long size)
 		else if (puc[1] != 0x00)
 			printf("23 ]: expected[ 00 ], found[ %02X ]\n", puc[1]);
 	}
-	else if (memcmp(&buf1_256[42], buf2_256, 214) != 0) {
+	else if (memcmp(&buf1_256[42], buf2_256, 214) != 0x00) {
 		for (i = 42; i < 256 && buf1_256[i] == 0; ++i);
 		printf("Error: invalid filler at offset[ %d ]: expected[ 00 ], found[ %02X ]\n", i, buf1_256[i]);
 	}
-	else if ((dirblks = *(long *)&buf1_256[16]) == 0) {
+	else if ((dirblks = *(long *)&buf1_256[16]) == 0x00) {
 		printf("Error: LIF header has 0 directory blocks at offset[ 16..19 ]\n");
 	}
 	else if (fread(buf1_256, 1, 256, fin) != 256) {

@@ -41,15 +41,21 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/io.h>
 #include <wordexp.h>	/* wordexp() */
 #endif
-#include <unistd.h>		/* access() */
-#include <dirent.h>		/* opendir() */
-#include <limits.h>		/* realpath() */
+#include <unistd.h>	/* access() */
+#include <dirent.h>	/* opendir() */
+#include <limits.h>	/* realpath() */
 #include <errno.h>
 #include <termios.h>
 #else
 #include <io.h>
 #include <conio.h>
 #endif
+
+#define HP41_TRUE	(1)
+#define HP41_FALSE	(0)
+#define HP41_ERROR	(-1)
+#define HP41_LONG_ERROR	(-1L)
+#define HP41_OK		(0)
 
 #ifndef _MAX_DRIVE
 #define _MAX_DRIVE	(3)
@@ -71,7 +77,7 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #define _MAX_PATH	(_MAX_DRIVE + _MAX_DIR + _MAX_FNAME + _MAX_EXT)
 #endif
 
-#define MAX_LIF_FILES	448
+#define MAX_LIF_FILES	2040	/* 255 directories * 8 files per direcrory */
 
 /* file types */
 typedef enum {
@@ -104,6 +110,28 @@ extern FILE_DESC lif;
 extern FILE_DESC p41;
 extern FILE_DESC raw;
 extern FILE_DESC txt;
+
+#define MAX_XROM_MODULES	32
+#define MAX_XROM_FUNCTIONS	64
+#define MAX_XROM_NAME		8
+
+typedef struct {
+	char *function_name;
+	int module_id;
+	int function_id;
+} INTERNAL_XROM;
+
+typedef struct {
+	char function_name[MAX_XROM_NAME];
+	int module_id;
+	int function_id;
+} EXTERNAL_XROM;
+
+extern int internal_xrom_enable[];
+extern INTERNAL_XROM internal_xrom_table[];
+extern int internal_xrom_entries;
+extern EXTERNAL_XROM external_xrom_table[];
+extern int external_xrom_entries;
 
 /* compiler flags */
 typedef enum {
@@ -192,12 +220,15 @@ void file_splitpath(
 	);
 
 int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext);
-int get_output_path(char *out_path, char *out_file, char *out_ext);
+int get_file_path(char *io_path, char *io_file, char *io_ext);
 
 void getfullpath(char *fullpath, char *dirpath, char *name);
 int matching_file_ext(char *cur_path, char *new_ext);
 int exists_as_directory(char *path);
 void terminate_directory(char *path);
+
+int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr, int comma_as_end, int max_args);
+int is_inquotes(unsigned char *buffer);
 
 void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name);
 void lifdump(char *infile, char *name);
@@ -206,9 +237,17 @@ void p41dump(char *infile);
 void barcode_init(void);
 void barcode(char *infile, char *outfile, char *title);
 
+void enable_internal_xrom_all(int state);
+void enable_internal_xrom_one(int id, int state);
+int is_enable_internal_xrom(int id);
+void dump_excluded_xrom_modules(void);
+void dump_internal_xrom_module_all(void);
+void dump_internal_xrom_module_one(int id);
+int parse_xrom_files(void);
+int parse_xrom_buffer(char *buffer, size_t count);
+char *get_xrom_function(char *name);
+
 void decompile_init(void);
-void decompile_xrom_all(int state);
-void decompile_xrom_one(int id, int state);
 int decompile(unsigned char *out_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend);
@@ -230,8 +269,8 @@ void compile_end(unsigned char *buffer, int bytes);
 
 int oktowrite(char *path);
 
-FILE *open_input(char *inpath, long inlength, char *infile, char *outpath);
-
+FILE *open_input_ex(char *inpath, long inlength, char *infile, char *outpath);
+FILE *open_input(char *inpath, char *infile);
 FILE *open_output(char *outpath);
 
 long read_bin_size(FILE *fin, char *inpath, long length);
@@ -372,5 +411,3 @@ extern char *postfix00_7F[];
 extern char *alt_postfix102_111[];
 
 extern char *alt_postfix117_122[];
-
-

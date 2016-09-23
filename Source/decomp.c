@@ -26,22 +26,6 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include "hp41uc.h"
 #include "decomp.h"
 
-XROM_DECOMP xrom_list[] = {
-		{ 17, 40, xrom17 },
-		{ 18, 21, xrom18 },
-		{ 22, 62, xrom22 },
-		{ 23, 63, xrom23 },
-		{ 24, 21, xrom24 },
-		{ 25, 63, xrom25 },
-		{ 26, 36, xrom26 },
-		{ 27, 7, xrom27 },
-		{ 28, 42, xrom28 },
-		{ 29, 26, xrom29 },
-		{ 30, 37, xrom30 },
-};
-
-static int decomp_xrom[32] = { 0 };
-
 static char pKey[] = " Key: rc";
 static char psKey[] = " Key: -rc";
 static unsigned char synth_buffer[18];
@@ -49,7 +33,7 @@ static unsigned char buffer6[6];
 
 static int end = 0;
 static int line = 1;
-static int numeric = 0;
+static int numeric = HP41_FALSE;
 static DECOMPILE_STATE state = BYTE1;
 static SEEK_STATE seek_state = SEEK_BYTE1;
 
@@ -67,39 +51,20 @@ void decompile_init(void)
 {
 	end = 0;
 	line = 1;
-	numeric = 0;
+	numeric = HP41_FALSE;
 	state = BYTE1;
 	seek_state = SEEK_BYTE1;
-}
-
-void decompile_xrom_all(int state)
-{
-	int count, id;
-
-	count = sizeof(decomp_xrom) / sizeof(int);
-	for (id = 0; id < count; ++id)
-		decomp_xrom[id] = state;
-}
-
-void decompile_xrom_one(int id, int state)
-{
-	int count;
-
-	count = sizeof(decomp_xrom) / sizeof(int);
-	if (id < count)
-		decomp_xrom[id] = state;
 }
 
 int decompile(unsigned char *pout_buffer, int out_size,
 	unsigned char **pin_buffer, int *pin_count,
 	int *ppending, int *pend)
 {
-	int i, j, k, m;
+	int i, j, mm, ff;
 	unsigned char c;
-	char **xrom;
+	char *xrom;
 	int do_xrom;
-	int xrom_count;
-	int done = 0;
+	int done = HP41_FALSE;
 
 	consumed = 0;
 	produced = 0;
@@ -113,14 +78,14 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			if (c >= 0x10 && c <= 0x1C) {
 				i = c - 1;
 				if (copy_prefix((char *)single01_1C[i], out_size)) {
-					numeric = 1;
+					numeric = HP41_TRUE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (numeric) {
-				numeric = 0;
+				numeric = HP41_FALSE;
 				state = APPEND_CR;
 			}
 			else if (c == 0x00) {
@@ -133,40 +98,40 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c == 0x1D) {
 				if (copy_prefix((char *)prefixGTO, out_size)) {
-					synth_flag = 0;
+					synth_flag = HP41_FALSE;
 					synth_count = 1;
 					synth_buffer[0] = c;
 					state = ALPHA_OPEN_QUOTE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c == 0x1E) {
 				if (copy_prefix((char *)prefixXEQ, out_size)) {
-					synth_flag = 0;
+					synth_flag = HP41_FALSE;
 					synth_count = 1;
 					synth_buffer[0] = c;
 					state = ALPHA_OPEN_QUOTE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c == 0x1F) {
 				if (copy_prefix((char *)prefixW, out_size)) {
-					synth_flag = 0;
+					synth_flag = HP41_FALSE;
 					synth_count = 1;
 					synth_buffer[0] = c;
 					state = ALPHA_OPEN_QUOTE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0x20 && c <= 0x8F) {
@@ -175,7 +140,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0x90 && c <= 0x9F) {
@@ -184,7 +149,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_POSTFIX;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0xA0 && c <= 0xA7) {
@@ -199,7 +164,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_POSTFIX;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c == 0xAE) {
@@ -225,13 +190,13 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_GTO_IGNORE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0xC0 && c <= 0xCD) {
 				++in_buffer;
 				++consumed;
-				synth_flag = 0;
+				synth_flag = HP41_FALSE;
 				synth_count = 1;
 				synth_buffer[0] = c;
 				state = BYTE2_GLOBAL_IGNORE;
@@ -242,7 +207,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_POSTFIX;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0xD0 && c <= 0xDF) {
@@ -250,7 +215,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_OF3_IGNORE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else if (c >= 0xE0 && c <= 0xEF) {
@@ -258,14 +223,14 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = BYTE2_OF3_IGNORE;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else {
 				++in_buffer;
 				++consumed;
 				count = c & 0x0F;
-				synth_flag = 0;
+				synth_flag = HP41_FALSE;
 				synth_count = 1;
 				synth_buffer[0] = c;
 				state = TEXT_OPEN_QUOTE;
@@ -276,24 +241,24 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			c = *in_buffer;
 			if (c < 0x80) {
 				if (copy_prefix((char *)prefixGTO_IND_NOP, out_size)) {
-					synth_flag = 1;
+					synth_flag = HP41_TRUE;
 					synth_count = 2;
 					synth_buffer[1] = c;
 					state = APPEND_SYNTH;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else {
 				if (copy_prefix((char *)prefixXEQ_IND_NOP, out_size)) {
-					synth_flag = 1;
+					synth_flag = HP41_TRUE;
 					synth_count = 2;
 					synth_buffer[1] = c;
 					state = APPEND_SYNTH;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			break;
@@ -301,13 +266,13 @@ int decompile(unsigned char *pout_buffer, int out_size,
 		case BYTE2_NOP:
 			c = *in_buffer;
 			if (copy_prefix((char *)prefixGTO_NOP, out_size)) {
-				synth_flag = 1;
+				synth_flag = HP41_TRUE;
 				synth_count = 2;
 				synth_buffer[1] = c;
 				state = APPEND_SYNTH;
 			}
 			else {
-				done = 1;
+				done = HP41_TRUE;
 			}
 			break;
 
@@ -319,39 +284,49 @@ int decompile(unsigned char *pout_buffer, int out_size,
 
 		case BYTE2_XROM:
 			c = *in_buffer;
-			m = (count << 2) + (c >> 6);
-			i = c & 0x3F;
-			j = sizeof(xrom_list) / sizeof(XROM_DECOMP);
-			xrom_count = sizeof(decomp_xrom) / sizeof(int);
+			mm = (count << 2) + (c >> 6);
+			ff = c & 0x3F;
+			done = HP41_TRUE;
+			do_xrom = HP41_FALSE;
 
-			for (k = 0, do_xrom = 0; k < j && do_xrom == 0; ++k) {
-				xrom = xrom_list[k].xrom;
-				if (m && m < xrom_count && decomp_xrom[m] &&
-					m == xrom_list[k].module_id &&
-					i < xrom_list[k].functions &&
-					xrom && strlen(xrom[i])) {
-					do_xrom = 1;
-					if (copy_prefix(xrom[i], out_size)) {
+			sprintf((char *)buffer6, "%02d", mm);
+			memcpy(&prefixXROM[5], buffer6, 2);
+			sprintf((char *)buffer6, "%02d", ff);
+			memcpy(&prefixXROM[8], buffer6, 2);
+			strcpy((char *)synth_buffer, "  ;");
+			strcat((char *)synth_buffer, (char *)prefixXROM);
+
+			if (mm < MAX_XROM_MODULES && ff < MAX_XROM_FUNCTIONS) {
+				for (i = 0; i < internal_xrom_entries && do_xrom == HP41_FALSE; ++i) {
+					xrom = internal_xrom_table[i].function_name;
+					if (is_enable_internal_xrom(mm) && strlen(xrom) &&
+						mm == internal_xrom_table[i].module_id &&
+						ff == internal_xrom_table[i].function_id) {
+						do_xrom = HP41_TRUE;
+						if (copy_prefix2(xrom, (char *)synth_buffer, out_size)) {
+							done = HP41_FALSE;
+							state = APPEND_CR;
+						}
+					}
+				}
+				for (i = 0; i < external_xrom_entries && do_xrom == HP41_FALSE; ++i) {
+					xrom = external_xrom_table[i].function_name;
+					if (strlen(xrom) &&
+						mm == external_xrom_table[i].module_id &&
+						ff == external_xrom_table[i].function_id) {
+						do_xrom = HP41_TRUE;
+						if (copy_prefix2(xrom, (char *)synth_buffer, out_size)) {
+							done = HP41_FALSE;
+							state = APPEND_CR;
+						}
+					}
+				}
+
+				if (do_xrom == HP41_FALSE) {
+					if (copy_prefix((char *)prefixXROM, out_size)) {
+						done = HP41_FALSE;
 						state = APPEND_CR;
 					}
-					else {
-						done = 1;
-					}
-				}
-			}
-
-			if (do_xrom == 0 &&
-				m < MAX_XROM_MODULES &&
-				i < MAX_ROM_FUNCTIONS) {
-				sprintf((char *)buffer6, "%02d", m);
-				memcpy(&prefixXROM[5], buffer6, 2);
-				sprintf((char *)buffer6, "%02d", i);
-				memcpy(&prefixXROM[8], buffer6, 2);
-				if (copy_prefix((char *)prefixXROM, out_size)) {
-					state = APPEND_CR;
-				}
-				else {
-					done = 1;
 				}
 			}
 			break;
@@ -364,7 +339,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else {
@@ -373,7 +348,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			break;
@@ -386,7 +361,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else {
@@ -395,7 +370,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					state = APPEND_CR;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			break;
@@ -413,7 +388,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 				state = APPEND_CR;
 			}
 			else {
-				done = 1;
+				done = HP41_TRUE;
 			}
 			break;
 
@@ -433,7 +408,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					end = 1;
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			else {
@@ -444,12 +419,12 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					if (count)
 						state = BYTE4_GLOBAL_IGNORE;
 					else {
-						synth_flag = 1;
+						synth_flag = HP41_TRUE;
 						state = CLOSE_QUOTE;
 					}
 				}
 				else {
-					done = 1;
+					done = HP41_TRUE;
 				}
 			}
 			break;
@@ -463,7 +438,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			if (count)
 				state = BYTE_ALPHA;
 			else {
-				synth_flag = 1;
+				synth_flag = HP41_TRUE;
 				state = CLOSE_QUOTE;
 			}
 			break;
@@ -476,7 +451,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			++synth_count;
 			synth_buffer[1] = c;
 			if (c <= 0xF0) {
-				synth_flag = 1;
+				synth_flag = HP41_TRUE;
 				state = CLOSE_QUOTE;
 			}
 			else {
@@ -497,7 +472,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					j += 4;
 			}
 			if (j > out_size)
-				done = 1;
+				done = HP41_TRUE;
 			else {
 				if (line_numbers) {
 					if (line > 99)
@@ -537,7 +512,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 							memcpy(out_buffer, buffer6, 2);
 							out_buffer += 2;
 							produced += 3;
-							synth_flag = 1;
+							synth_flag = HP41_TRUE;
 						}
 						else {
 							*out_buffer++ = c;
@@ -551,7 +526,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 				else {
 					*out_buffer++ = '\"';
 					++produced;
-					synth_flag = 1;
+					synth_flag = HP41_TRUE;
 				}
 				if (count)
 					state = BYTE_ALPHA;
@@ -570,7 +545,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 				memcpy(out_buffer, buffer6, 2);
 				out_buffer += 2;
 				produced += 3;
-				synth_flag = 1;
+				synth_flag = HP41_TRUE;
 			}
 			else {
 				*out_buffer++ = c;
@@ -597,7 +572,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			j = produced + (synth_count * 3) + 2;
 			j += room_for_key(synth_buffer, synth_count);
 			if (j > out_size)
-				done = 1;
+				done = HP41_TRUE;
 			else {
 				/* "text" */
 				if (synth_buffer[0] > 0xF0 && synth_count > 1)
@@ -664,7 +639,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			i = room_for_key(synth_buffer, synth_count);
 			j = produced + i + 3;
 			if (j > out_size)
-				done = 1;
+				done = HP41_TRUE;
 			else {
 				*out_buffer++ = 0x20;
 				*out_buffer++ = 0x20;
@@ -687,7 +662,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			*out_buffer++ = 0x0A;
 			++produced;
 			if (end)
-				done = 1;
+				done = HP41_TRUE;
 			state = BYTE1;
 			break;
 		}
@@ -701,7 +676,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 			state != APPEND_CR &&
 			state != APPEND_LF &&
 			(state != TEXT_OPEN_QUOTE || count)))
-			done = 1;
+			done = HP41_TRUE;
 
 	} while (!done);
 
@@ -958,4 +933,3 @@ int seek_end(unsigned char *buffer, int count)
 
 	return(end);
 }
-

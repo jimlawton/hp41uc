@@ -46,7 +46,7 @@ void barcode(char *infile, char *outfile, char *title)
 	static char clone_dir_path[_MAX_PATH];
 	static char clone_file_path[_MAX_PATH];
 	char bc_ext[_MAX_EXT];
-	int clone_input = 0;
+	int clone_input = HP41_FALSE;
 	int i, j, k;
 	long blk, reg;
 	long prog_pos;
@@ -72,7 +72,7 @@ void barcode(char *infile, char *outfile, char *title)
 	get_bc_ext(bc_ext);
 
 	/* get input file(s) */
-	if ((files = find_input_files(&rawfile, dirpath, infile, ".raw")) == 0) {
+	if ((files = find_input_files(&rawfile, dirpath, infile, ".raw")) == HP41_OK) {
 		goto barcode_exit;
 	}
 
@@ -86,16 +86,16 @@ void barcode(char *infile, char *outfile, char *title)
 	/* get output path */
 	if (outfile == NULL || *outfile == '\0') {
 		clone_dir_path[0] = '\0';
-		clone_input = 1;
+		clone_input = HP41_TRUE;
 	}
-	else if (get_output_path(outpath, outfile, bc_ext) != 0) {
+	else if (get_file_path(outpath, outfile, bc_ext) != HP41_OK) {
 		goto barcode_exit;
 	}
-	else if (exists_as_directory(outpath) != -1) {
+	else if (exists_as_directory(outpath) != HP41_ERROR) {
 		/* outpath is a directory */
 		strcpy(clone_dir_path, outpath);
 		terminate_directory(clone_dir_path);
-		clone_input = 1;
+		clone_input = HP41_TRUE;
 	}
 
 	/* set input path */
@@ -114,7 +114,7 @@ void barcode(char *infile, char *outfile, char *title)
 	}
 
 	/* open input file */
-	if ((fin = open_input(inpath, inlength, infile, outpath))) {
+	if ((fin = open_input_ex(inpath, inlength, infile, outpath))) {
 		/* open output file */
 		if ((fout = open_output(outpath))) {
 			/* show banner */
@@ -576,7 +576,7 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 	int produced = 0;
 	unsigned char c, *inp, *outp;
 	static int line = 0;
-	static int numeric = 0;
+	static int numeric = HP41_FALSE;
 	static int multi_byte = 0;
 	static int trail_count = 0;
 	static int lead_count;
@@ -619,14 +619,14 @@ int decode_row(unsigned char **pout_buffer, int out_size,
 					++multi_byte;
 				else {
 					++line;
-					numeric = 1;
+					numeric = HP41_TRUE;
 					trail_count = 0;
 					multi_byte = 1;
 				}
 			}
 			else {
-				numeric = 0;
-				if (c != 0x00)
+				numeric = HP41_FALSE;
+				if (c != '\0')
 					++line;
 
 				if (c >= 0x1D && c <= 0x1F) {
@@ -816,4 +816,3 @@ void get_bc_type(char *type)
 	else
 		strcpy(type, "Hex Dump");
 }
-

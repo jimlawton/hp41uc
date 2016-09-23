@@ -26,17 +26,34 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 #include "hp41uc.h"
 #include "hp41ucg.h"
 
+static char *xrom_file_path[MAX_XROM_MODULES] = { 0 };
+static int xrom_file_count = 0;
+
+/* compiler states */
+typedef enum {
+	XROM_SEEK_START_LINE,
+	XROM_GET_LINE,
+	XROM_SEEK_END_LINE,
+	XROM_LINE_OUTPUT,
+	XROM_IGNORE_BAD_LINE
+} XROM_STATE;
+
+#define XROM_ARGS	3
+#define XROM_LINE	128
+
 int main(int argc, char *argv[])
 {
 	int h, i, j, k;
 	char in = 0, out = 0;
-	char *name = 0;
-	char *infile = 0, *outfile = 0;
+	char *name = NULL;
+	char *infile = NULL, *outfile = NULL;
+	int xrom_disable_all = HP41_FALSE;
+	int xrom_disable_one = HP41_FALSE;
 	int xrom_id;
 	char *endptr;
 
-	/* decmpile XROMs by default */
-	decompile_xrom_all(1);
+	/* enable XROMs by default */
+	enable_internal_xrom_all(HP41_TRUE);
 
 	/* parser */
 	for (h = 0, i = 1; i < argc && !h; ++i) {
@@ -57,40 +74,46 @@ int main(int argc, char *argv[])
 		}
 
 		/* start parsing */
-		if (_stricmp(argv[i], "?") == 0)
+		if (_stricmp(argv[i], "?") == HP41_OK)
 			h = 1;
-		else if (_stricmp(argv[i], "-a") == 0 ||
-			_stricmp(argv[i], "/a") == 0) {
-			text_append = 1;
+		else if (_stricmp(argv[i], "-a") == HP41_OK ||
+			_stricmp(argv[i], "/a") == HP41_OK) {
+			text_append = HP41_TRUE;
 		}
-		else if (_stricmp(argv[i], "-g") == 0 ||
-			_stricmp(argv[i], "/g") == 0) {
-			force_global = 1;
+		else if (_stricmp(argv[i], "-g") == HP41_OK ||
+			_stricmp(argv[i], "/g") == HP41_OK) {
+			force_global = HP41_TRUE;
 		}
-		else if (_stricmp(argv[i], "-h") == 0 ||
-			_stricmp(argv[i], "/h") == 0) {
+		else if (_stricmp(argv[i], "-h") == HP41_OK ||
+			_stricmp(argv[i], "/h") == HP41_OK) {
 			bc_printer = PRINTER_HP;
 		}
-		else if (_stricmp(argv[i], "-s") == 0 ||
-			_stricmp(argv[i], "/s") == 0) {
+		else if (_stricmp(argv[i], "-s") == HP41_OK ||
+			_stricmp(argv[i], "/s") == HP41_OK) {
 			bc_printer = PRINTER_POSTCRIPT;
 		}
-		else if (_stricmp(argv[i], "-n") == 0 ||
-			_stricmp(argv[i], "/n") == 0) {
-			line_numbers = 1;
+		else if (_stricmp(argv[i], "-n") == HP41_OK ||
+			_stricmp(argv[i], "/n") == HP41_OK) {
+			line_numbers = HP41_TRUE;
 		}
-		else if (_stricmp(argv[i], "-k") == 0 ||
-			_stricmp(argv[i], "/k") == 0) {
-			raw_checksum = 0;
+		else if (_stricmp(argv[i], "-k") == HP41_OK ||
+			_stricmp(argv[i], "/k") == HP41_OK) {
+			raw_checksum = HP41_FALSE;
 		}
-		else if (_strnicmp(argv[i], "-x", 2) == 0 ||
-			_strnicmp(argv[i], "/x", 2) == 0) {
+		else if (_strnicmp(argv[i], "-x", 2) == HP41_OK ||
+			_strnicmp(argv[i], "/x", 2) == HP41_OK) {
 			if (strlen(argv[i]) == 2) {
-				decompile_xrom_all(0);
+				xrom_disable_all = HP41_TRUE;
 			}
 			else {
 				xrom_id = (int)strtoul(&argv[i][2], &endptr, 10);
-				decompile_xrom_one(xrom_id, 0);
+				if (xrom_id < MAX_XROM_MODULES) {
+					enable_internal_xrom_one(xrom_id, HP41_FALSE);
+					xrom_disable_one = HP41_TRUE;
+				}
+				else {
+					h = 1;
+				}
 			}
 		}
 		else if (k) {
@@ -201,11 +224,15 @@ int main(int argc, char *argv[])
 					h = 1;
 				}
 			}
+			else if (argv[i][j] == 'm' || argv[i][j] == 'M') {
+				if (xrom_file_count < MAX_XROM_MODULES && argv[i][k])
+					xrom_file_path[xrom_file_count++] = &argv[i][k];
+			}
 			else {
 				h = 1;
 			}
 		}
-		else if (name == 0) {
+		else if (name == NULL) {
 			name = argv[i];
 		}
 		else {
@@ -222,7 +249,7 @@ int main(int argc, char *argv[])
 		/* set default help */
 		h = in ? in : (out ? out : 1);
 
-		/* have input file spec? */
+		/* input file spec? */
 		if (!infile || *infile == '\0') {
 			if (in == 'L' && out == 0 && name && *name != '\0') {
 				lifdump(name, NULL);
@@ -232,11 +259,24 @@ int main(int argc, char *argv[])
 				p41dump(name);
 				h = 0;
 			}
-			else if (in && out) {
+			else if (in == 0) {
+				if (xrom_disable_all) {
+					dump_internal_xrom_module_all();
+					h = 0;
+				}
+				if (xrom_disable_one) {
+					dump_excluded_xrom_modules();
+					h = 0;
+				}
+			}
+			else if (out) {
 				printf("Error: missing input path specification.\n");
 			}
 		}
 		else {
+			if (xrom_disable_all)
+				enable_internal_xrom_all(HP41_FALSE);
+
 			if (in == 'B') {
 				if (out == 'L') {
 					convert(infile, &bin, outfile, &lif, name);
@@ -246,7 +286,7 @@ int main(int argc, char *argv[])
 					convert(infile, &bin, outfile, &p41, name);
 					h = 0;
 				}
-				else if (name == 0) {
+				else if (name == NULL) {
 					if (out == 'D') {
 						convert(infile, &bin, outfile, &dat, NULL);
 						h = 0;
@@ -256,7 +296,8 @@ int main(int argc, char *argv[])
 						h = 0;
 					}
 					else if (out == 'T') {
-						convert(infile, &bin, outfile, &txt, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &bin, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
@@ -270,7 +311,7 @@ int main(int argc, char *argv[])
 					convert(infile, &dat, outfile, &p41, name);
 					h = 0;
 				}
-				else if (name == 0) {
+				else if (name == NULL) {
 					if (out == 'B') {
 						convert(infile, &dat, outfile, &bin, NULL);
 						h = 0;
@@ -280,7 +321,8 @@ int main(int argc, char *argv[])
 						h = 0;
 					}
 					else if (out == 'T') {
-						convert(infile, &dat, outfile, &txt, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &dat, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
@@ -303,7 +345,8 @@ int main(int argc, char *argv[])
 					h = 0;
 				}
 				else if (out == 'T') {
-					convert(infile, &lif, outfile, &txt, name);
+					if (parse_xrom_files() == HP41_OK)
+						convert(infile, &lif, outfile, &txt, name);
 					h = 0;
 				}
 				else if (out == 0) {
@@ -312,7 +355,7 @@ int main(int argc, char *argv[])
 				}
 			}
 			else if (in == 'P') {
-				if (name == 0) {
+				if (name == NULL) {
 					if (out == 'B') {
 						convert(infile, &p41, outfile, &bin, NULL);
 						h = 0;
@@ -330,7 +373,8 @@ int main(int argc, char *argv[])
 						h = 0;
 					}
 					else if (out == 'T') {
-						convert(infile, &p41, outfile, &txt, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &p41, outfile, &txt, NULL);
 						h = 0;
 					}
 					else if (out == 0) {
@@ -353,7 +397,7 @@ int main(int argc, char *argv[])
 					barcode(infile, outfile, name);
 					h = 0;
 				}
-				else if (name == 0) {
+				else if (name == NULL) {
 					if (out == 'B') {
 						convert(infile, &raw, outfile, &bin, NULL);
 						h = 0;
@@ -363,31 +407,37 @@ int main(int argc, char *argv[])
 						h = 0;
 					}
 					else if (out == 'T') {
-						convert(infile, &raw, outfile, &txt, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &raw, outfile, &txt, NULL);
 						h = 0;
 					}
 				}
 			}
 			else if (in == 'T') {
 				if (out == 'L') {
-					convert(infile, &txt, outfile, &lif, name);
+					if (parse_xrom_files() == HP41_OK)
+						convert(infile, &txt, outfile, &lif, name);
 					h = 0;
 				}
 				else if (out == 'P') {
-					convert(infile, &txt, outfile, &p41, name);
+					if (parse_xrom_files() == HP41_OK)
+						convert(infile, &txt, outfile, &p41, name);
 					h = 0;
 				}
-				else if (name == 0) {
+				else if (name == NULL) {
 					if (out == 'B') {
-						convert(infile, &txt, outfile, &bin, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &txt, outfile, &bin, NULL);
 						h = 0;
 					}
 					else if (out == 'D') {
-						convert(infile, &txt, outfile, &dat, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &txt, outfile, &dat, NULL);
 						h = 0;
 					}
 					else if (out == 'R') {
-						convert(infile, &txt, outfile, &raw, NULL);
+						if (parse_xrom_files() == HP41_OK)
+							convert(infile, &txt, outfile, &raw, NULL);
 						h = 0;
 					}
 				}
@@ -399,6 +449,300 @@ int main(int argc, char *argv[])
 	help(h);
 
 	return 0;
+}
+
+void enable_internal_xrom_all(int state)
+{
+	int id;
+
+	for (id = 0; id < MAX_XROM_MODULES; ++id)
+		internal_xrom_enable[id] = state;
+}
+
+void enable_internal_xrom_one(int id, int state)
+{
+	if (id < MAX_XROM_MODULES)
+		internal_xrom_enable[id] = state;
+}
+
+int is_enable_internal_xrom(int id)
+{
+	if (id < MAX_XROM_MODULES)
+		return internal_xrom_enable[id];
+	return HP41_FALSE;
+}
+
+void dump_excluded_xrom_modules(void)
+{
+	int id;
+
+	for (id = 0; id < MAX_XROM_MODULES; ++id) {
+		if (internal_xrom_enable[id] == HP41_FALSE) {
+			dump_internal_xrom_module_one(id);
+		}
+	}
+}
+
+void dump_internal_xrom_module_all(void)
+{
+	int i;
+
+	printf("Supported XROM Modules:\n");
+	for (i = 0; i < internal_xrom_entries; ++i) {
+		if (internal_xrom_table[i].function_id >= MAX_XROM_FUNCTIONS) {
+			printf(" [ %02d ] %s\n", internal_xrom_table[i].module_id,
+				internal_xrom_table[i].function_name);
+		}
+	}
+}
+
+void dump_internal_xrom_module_one(int id)
+{
+	int i, n, functions;
+
+	functions = 0;
+	for (i = 0; i < internal_xrom_entries; ++i) {
+		if (internal_xrom_table[i].module_id == id) {
+			if (internal_xrom_table[i].function_id >= MAX_XROM_FUNCTIONS)
+				printf("XROM Module[ %d ]: %s\n", id, internal_xrom_table[i].function_name);
+			else {
+				++functions;
+				printf(" %s", internal_xrom_table[i].function_name);
+				n = (int)strlen(internal_xrom_table[i].function_name);
+				while (n++ < MAX_XROM_NAME)
+					printf(" ");
+				printf("%02d,%02d\n", id, internal_xrom_table[i].function_id);
+			}
+		}
+	}
+
+	printf("XROM Module[ %d ]: %d functions supported.\n", id, functions);
+}
+
+int parse_xrom_files(void)
+{
+	/* use static on large arrays to avoid growing the stack */
+	static char xrom_path[_MAX_PATH];
+	FILE *fin;
+	int i, f_error;
+	struct stat f_stats;
+	size_t f_size, f_block;
+
+	for (i = 0; i < xrom_file_count; ++i) {
+		if (xrom_file_path[i]) {
+			f_error = get_file_path(xrom_path, xrom_file_path[i], ".txt");
+			if (f_error)
+				return f_error;
+
+			fin = open_input(xrom_path, xrom_file_path[i]);
+			if (fin == NULL)
+				return HP41_ERROR;
+
+			f_error = fstat(_fileno(fin), &f_stats);
+			if (f_error) {
+				printf("Error getting size of XROM file[ %s ]\n", xrom_path);
+				fclose(fin);
+				return f_error;
+			}
+
+			f_size = (size_t)f_stats.st_size;
+			f_block = sizeof(buf_1024);
+			do {
+				if (f_block > f_size)
+					f_block = f_size;
+				if (fread(buf_1024, 1, f_block, fin) != f_block) {
+					printf("Error reading XROM file[ %s ]\n", xrom_path);
+					fclose(fin);
+					return HP41_ERROR;
+				}
+				f_error = parse_xrom_buffer((char *)buf_1024, f_block);
+				if (f_error)
+					printf("Error parsing XROM file[ %s ]\n", xrom_path);
+				f_size -= f_block;
+			} while (f_size && !f_error);
+
+			fclose(fin);
+			if (f_error) {
+				return f_error;
+			}
+		}
+	}
+
+	return HP41_OK;
+}
+
+int parse_xrom_buffer(char *buffer, size_t count)
+{
+	static int source_line = 0;
+	static int line_index = 0;
+	static int line_end = HP41_FALSE;
+	static unsigned char *line_ptr;
+	static unsigned char *line_argv[XROM_ARGS];
+	static unsigned char line_buffer[XROM_LINE];
+	static unsigned char error_line[XROM_LINE];
+	static XROM_STATE state = XROM_SEEK_START_LINE;
+	static int xrom_index = 0;
+	EXTERNAL_XROM *xrom;
+	int parse_error = HP41_OK;
+	int line_argc;
+	char *endptr;
+	char *name;
+	int mm, ff;
+	char c;
+
+	while (!parse_error && (count || state == XROM_LINE_OUTPUT)) {
+		switch (state) {
+		case XROM_SEEK_START_LINE:
+			c = *buffer++;
+			--count;
+			if (c == '\n' || c == '\f' || c == 0x1A) {
+				++source_line;
+			}
+			else if (c != '\r') {
+				line_buffer[line_index++] = c;
+				state = XROM_GET_LINE;
+			}
+			break;
+
+		case XROM_GET_LINE:
+			c = *buffer++;
+			--count;
+			if (c == '\n' || c == '\f' || c == 0x1A) {
+				line_end = HP41_TRUE;
+			}
+			else if (c == '\r') {
+				state = XROM_SEEK_END_LINE;
+			}
+			else if (line_index == XROM_LINE) {
+				line_index = 0;
+				++source_line;
+				printf("XROM Error: line too long!\n");
+				state = XROM_IGNORE_BAD_LINE;
+				parse_error = HP41_ERROR;
+			}
+			else {
+				line_buffer[line_index++] = c;
+			}
+			break;
+
+		case XROM_SEEK_END_LINE:
+			c = *buffer++;
+			--count;
+			if (c == '\n' || c == '\f' || c == 0x1A) {
+				line_end = HP41_TRUE;
+			}
+			else if (c != '\r') {
+				line_index = 0;
+				++source_line;
+				printf("XROM Error: found[ %c ] expecting end-of-line character.\n", c);
+				state = XROM_IGNORE_BAD_LINE;
+				parse_error = HP41_ERROR;
+			}
+			break;
+
+		case XROM_LINE_OUTPUT:
+			/* parse line arguments */
+			strcpy((char *)error_line, (char *)line_ptr);
+			if ((line_argc = get_line_args(line_argv, &line_ptr, HP41_FALSE, XROM_ARGS))) {
+				if (xrom_index < external_xrom_entries) {
+					if (line_argc < XROM_ARGS || strlen((char *)line_ptr)) {
+						parse_error = HP41_ERROR;
+					}
+					else {
+						name = get_xrom_function((char *)line_argv[0]);
+						mm = (int)strtoul((char *)line_argv[1], &endptr, 10);
+						ff = (int)strtoul((char *)line_argv[2], &endptr, 10);
+
+						if (name && mm && mm < MAX_XROM_MODULES && ff < MAX_XROM_FUNCTIONS) {
+							xrom = &external_xrom_table[xrom_index++];
+							strcpy(xrom->function_name, name);
+							xrom->module_id = mm;
+							xrom->function_id = ff;
+						}
+						else {
+							parse_error = HP41_ERROR;
+						}
+					}
+					if (parse_error) {
+						printf("XROM Error: invalid arguments[ %s ]\n", error_line);
+						state = XROM_SEEK_START_LINE;
+					}
+				}
+				else {
+					printf("XROM Error: file too long!\n");
+					state = XROM_SEEK_START_LINE;
+					parse_error = HP41_ERROR;
+				}
+			}
+			else {
+				/* nothing to do in this line, let's contuinue */
+				state = XROM_SEEK_START_LINE;
+			}
+			break;
+
+		case XROM_IGNORE_BAD_LINE:
+			c = *buffer++;
+			--count;
+			/* end-of-line? */
+			if (c == '\n' || c == '\f' || c == 0x1A) {
+				state = XROM_SEEK_START_LINE;
+			}
+			break;
+		}
+
+		/* end-of-line? */
+		if (line_end) {
+			line_buffer[line_index] = '\0';
+			line_ptr = line_buffer;
+			line_index = 0;
+			line_end = HP41_FALSE;
+			++source_line;
+			state = XROM_LINE_OUTPUT;
+		}
+
+		/* any errors? */
+		if (parse_error) {
+			printf("XROM error on line %d.\n", source_line);
+		}
+	}
+
+	return parse_error;
+}
+
+char *get_xrom_function(char *name)
+{
+	char *str;
+	int i, n;
+
+	str = name;
+	if (name) {
+		n = strlen(name);
+		/* remove quotes */
+		if (n > 1 && name[0] == '\"' && name[n - 1] == '\"') {
+			name[n - 1] = '\0';
+			++str;
+			n -= 2;
+		}
+
+		/* invalid length? */
+		if (n == 0 || n >= MAX_XROM_NAME) {
+			str = NULL;
+		}
+		else {
+			/* invalid chracters? */
+			for (i = 0; i < n && str; ++i) {
+				if (str[i] < 0x20 ||
+					str[i] > 0x7E ||
+					str[i] == ',' ||
+					str[i] == '.' ||
+					str[i] == ':') {
+					str = NULL;
+				}
+			}
+		}
+	}
+
+	return str;
 }
 
 int hextoascii(unsigned char *ascii_buffer,
@@ -433,6 +777,100 @@ int asciitohex(unsigned char *hex_buffer,
 	return(j);
 }
 
+int get_line_args(unsigned char *line_argv[], unsigned char **line_ptr, int comma_as_end, int max_args)
+{
+	unsigned char *pc;
+	int i, j, count, done;
+
+	count = 0;
+	pc = *line_ptr;
+	done = (*pc == '\0');
+	while (!done) {
+		/* ignore leading spaces */
+		while (*pc == '\t' || *pc == 0x20)
+			++pc;
+
+		/* ignore comment line */
+		if (*pc == ';' ||
+			*pc == '#' ||
+			*pc == '\0') {
+			done = HP41_TRUE;
+		}
+		else {
+			/* get argument */
+			i = 0;
+			do {
+				/* consider quotes as a unit */
+				j = is_inquotes(&pc[i]);
+				i += j + 1;
+
+				/* end of line? */
+				if (pc[i] == '\0') {
+					done = 2;
+				}
+				else if (pc[i] == ',') {
+					/* end of instruction? */
+					if (comma_as_end) {
+						if (pc[i] == '\t' || pc[i] == 0x20) {
+							pc[i] = '\0';
+							done = HP41_TRUE;
+						}
+					}
+					/* end of argument */
+					else {
+						pc[i] = '\0';
+					}
+				}
+				/* end of argument? */
+				else if (pc[i] == '\t' || pc[i] == 0x20) {
+					pc[i] = '\0';
+				}
+			} while (pc[i] != '\0');
+
+			/* put argument in list */
+			line_argv[count++] = pc;
+
+			/* point to next argument */
+			pc += strlen((char *)pc);
+			if (done != 2)
+				++pc;
+
+			/* full list? */
+			if (count == max_args) {
+				done = HP41_TRUE;
+			}
+		}
+	}
+
+	/* update line pointer */
+	*line_ptr = pc;
+
+	return(count);
+}
+
+int is_inquotes(unsigned char *buffer)
+{
+	int i, j;
+
+	j = (int)strlen((char *)buffer);
+	if (buffer[0] == '\"' || buffer[0] == '\'') {
+		for (i = 1; i < j; ++i) {
+			if (buffer[i] == buffer[0] &&
+				buffer[i - 1] != '\\') {
+				if (buffer[i + 1] == buffer[0])
+					++i;
+				else if (buffer[i + 1] == '\0' ||
+					buffer[i + 1] == '\t' ||
+					buffer[i + 1] == 0x20) {
+					return(i);
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext)
 {
 	/* use static on large arrays to avoid growing the stack */
@@ -448,12 +886,12 @@ int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext)
 
 	/* find FIRST file, allow wildcards */
 	strcpy(in_dir, path);
-	if (findfile_first(in_dir, ff) == -1) {
+	if (findfile_first(in_dir, ff) == HP41_ERROR) {
 		strcat(in_dir, in_ext);
-		if (findfile_first(in_dir, ff) == -1) {
+		if (findfile_first(in_dir, ff) == HP41_ERROR) {
 			strcpy(in_dir, path);
 			strcat(in_dir, "\\*.*");
-			if (findfile_first(in_dir, ff) == -1) {
+			if (findfile_first(in_dir, ff) == HP41_ERROR) {
 				files = 0;
 			}
 		}
@@ -462,12 +900,12 @@ int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext)
 	/* find NEXT files */
 	if (files) {
 		/* count number of files in directory */
-		while (findfile_next(ff) == 0)
+		while (findfile_next(ff) == HP41_OK)
 			++files;
 
 		/* rewind search to the beginning */
 		findfile_close(ff);
-		if (findfile_first(in_dir, ff) == -1) {
+		if (findfile_first(in_dir, ff) == HP41_ERROR) {
 			files = 0;
 		}
 	}
@@ -479,55 +917,64 @@ int find_input_files(FIND_FILE *ff, char *in_dir, char *in_file, char *in_ext)
 	return(files);
 }
 
-int get_output_path(char *out_path, char *out_file, char *out_ext)
+int get_file_path(char *io_path, char *io_file, char *io_ext)
 {
-	if (file_fullpath(out_path, out_file) == NULL) {
-		printf("Error: invalid output path[ %s ]\n", out_file);
-		return -1;
+	if (file_fullpath(io_path, io_file) == NULL) {
+		printf("Error: invalid file path[ %s ]\n", io_file);
+		return HP41_ERROR;
 	}
 
-	/* use default .ext on new output path? */
-	if (file_access(out_path, FILE_EXIST) == -1 && out_ext) {
-		file_splitpath(out_path, drive, dir, fname, ext);
+	/* use default .ext? */
+	if (file_access(io_path, FILE_EXIST) != HP41_OK && io_ext) {
+		file_splitpath(io_path, drive, dir, fname, ext);
 		if (*ext == '\0') {
-			strcat(out_path, out_ext);
+			strcat(io_path, io_ext);
 		}
 	}
-	return 0;
+
+	return HP41_OK;
 }
 
 int exists_as_directory(char *path)
 {
 	FILE *file;
 
-	if (file_access(path, FILE_EXIST) != -1 &&
-		file_access(path, FILE_WRITE_OK) != -1) {
+	if (file_access(path, FILE_EXIST) != HP41_ERROR &&
+		file_access(path, FILE_WRITE_OK) != HP41_ERROR) {
 		/* try to open it as a file */
 		if ((file = fopen(path, "w+b")) == NULL)
-			return 0;
+			return HP41_OK;
 		fclose(file);
 	}
 
-	return - 1;
+	return HP41_ERROR;
 }
 
-FILE *open_input(char *inpath, long inlength, char *infile, char *outpath)
+FILE *open_input_ex(char *inpath, long inlength, char *infile, char *outpath)
 {
-	FILE *fin = NULL;
-
-	if (outpath && _stricmp(inpath, outpath) == 0) {
+	if (outpath && _stricmp(inpath, outpath) == HP41_OK) {
 		printf("Error: input file cannot be output file[ %s ]\n",
 			outpath);
+		return NULL;
 	}
-	else if (inlength <= 0) {
+
+	if (inlength <= 0) {
 		printf("Error: empty input file[ %s ]\n", inpath);
+		return NULL;
 	}
-	else if ((fin = fopen(inpath, "rb")) == NULL) {
+
+	return open_input(inpath, infile);
+}
+
+FILE *open_input(char *inpath, char *infile)
+{
+	FILE *fin;
+
+	if ((fin = fopen(inpath, "rb")) == NULL) {
 		printf("Error opening input file[ %s ]", inpath);
-		if (_stricmp(inpath, infile) != 0)
+		if (_stricmp(inpath, infile) != HP41_OK)
 			printf(", from[ %s ]", infile);
 		printf("\n");
-	
 	}
 
 	return(fin);
@@ -564,17 +1011,17 @@ int oktowrite(char *path)
 {
 	int c;
 
-	if (file_access(path, FILE_EXIST) != -1) {
-		if (file_access(path, FILE_WRITE_OK) != -1) {
+	if (file_access(path, FILE_EXIST) != HP41_ERROR) {
+		if (file_access(path, FILE_WRITE_OK) != HP41_ERROR) {
 			printf("Overwrite %s (Yes/[No])?", path);
 			do {
 				c = _getch();
 				if (c == 'y' || c == 'Y') {
 					printf("%c\n", c);
-					return 1;
+					return HP41_TRUE;
 				}
 				/* function or cursor key? */
-				else if (c == 0 || c == 0xE0) {
+				else if (c == 0x00 || c == 0xE0) {
 					/* 2-character sequence */
 					_getch();
 				}
@@ -591,17 +1038,17 @@ int oktowrite(char *path)
 						printf("\n");
 					}
 					printf("No output file written.\n");
-					return 0;
+					return HP41_FALSE;
 				}
 			} while (1);
 		}
 		else {
 			printf("No permission to write[ %s ]\n", path);
-			return 0;
+			return HP41_FALSE;
 		}
 	}
 
-	return 1;
+	return HP41_TRUE;
 }
 
 void terminate_directory(char *path)
@@ -628,7 +1075,7 @@ void findfile_init(FIND_FILE *ff)
 	}
 #else	/* _MSC_VER */
 	if (ff != NULL) {
-		ff->phandle = (void *)-1L;
+		ff->phandle = (void *)HP41_LONG_ERROR;
 	}
 #endif
 }
@@ -641,13 +1088,13 @@ int findfile_first(char *path, FIND_FILE *ff)
 	struct dirent *ffd;
 	struct stat f_stats;
 	DIR *pdir, *f_pdir;
-	int check_path_end = 0;
+	int check_path_end = HP41_FALSE;
 	/* use static on large arrays to avoid growing the stack */
 	static char f_path[_MAX_PATH];
 	static char f_dir[_MAX_PATH];
 
 	if (ff == NULL)
-		return -1;
+		return HP41_ERROR;
 
 	if (path != NULL) {
 		to_unix_path(path);
@@ -655,16 +1102,16 @@ int findfile_first(char *path, FIND_FILE *ff)
 		/* check for wildcard on fname */
 		ff->data.file_ext[0] = '\0';
 		file_splitpath(path, drive, dir, fname, ext);
-		if (strcmp(fname, "*") == 0) {
+		if (strcmp(fname, "*") == HP41_OK) {
 			strcpy(f_path, drive);
 			strcat(f_path, dir);
 			strcpy(f_dir, f_path);
-			if (strcmp(ext, ".*") != 0) 
+			if (strcmp(ext, ".*") != HP41_OK)
 				strcpy(ff->data.file_ext, ext);
 		}
 		else {
 			strcpy(f_dir, path);
-			check_path_end = 1;
+			check_path_end = HP41_TRUE;
 		}
 
 		/* search for directory */
@@ -673,12 +1120,12 @@ int findfile_first(char *path, FIND_FILE *ff)
 			do {
 				ffd = readdir(pdir);
 				if (ffd != NULL && 
-					strcmp(ffd->d_name, ".") != 0 &&
-					strcmp(ffd->d_name, "..") != 0) {
+					strcmp(ffd->d_name, ".") != HP41_OK &&
+					strcmp(ffd->d_name, "..") != HP41_OK) {
 					/* ensure path is treated as a directory */
 					if (check_path_end) {
 						terminate_directory(path);
-						check_path_end = 0;
+						check_path_end = HP41_FALSE;
 					}
 
 					/* save directory path for 'next' search */
@@ -693,72 +1140,71 @@ int findfile_first(char *path, FIND_FILE *ff)
 					if (f_pdir != NULL) {
 						closedir(f_pdir);
 					}
-					else if (file_access(f_path, FILE_EXIST) != -1 &&
-						stat(f_path, &f_stats) == 0 && f_stats.st_size &&
-						matching_file_ext(f_path, ff->data.file_ext) == 0) {
+					else if (file_access(f_path, FILE_EXIST) != HP41_ERROR &&
+						stat(f_path, &f_stats) == HP41_OK && f_stats.st_size &&
+						matching_file_ext(f_path, ff->data.file_ext) == HP41_OK) {
 						/* found first file in directory */
 						ff->name = ffd->d_name;
 						ff->size = f_stats.st_size;
 						ff->phandle = (void *)pdir;
-						return 0;
+						return HP41_OK;
 					}
 				}
 			} while (ffd != NULL);
 			closedir(pdir);
 		}
 		/* search for file */
-		else if (file_access(path, FILE_EXIST) != -1 &&
-			stat(path, &f_stats) == 0 && f_stats.st_size) {
+		else if (file_access(path, FILE_EXIST) != HP41_ERROR &&
+			stat(path, &f_stats) == HP41_OK && f_stats.st_size) {
 			/* found a file */
 			file_splitpath(path, drive, dir, fname, ext);
 
 			/* searching for specific file.ext? */
 			if (ff->data.file_ext[0] == '\0' ||
-                            strcmp(ext, ff->data.file_ext) == 0) {
+				strcmp(ext, ff->data.file_ext) == HP41_OK) {
 				strcpy(ff->data.file_spec, fname);
 				strcat(ff->data.file_spec, ext);
 				ff->name = ff->data.file_spec;
 				ff->size = f_stats.st_size;
 				ff->phandle = NULL;
-				return 0;
+				return HP41_OK;
 			}
 		}
 	}
 
 	ff->phandle = NULL;
-	return -1;
-
+	return HP41_ERROR;
 #else	/* _MSC_VER */
 	struct _finddata_t *ffd;
 	intptr_t hFind;
-	int ret = 0;
+	int ret = HP41_OK;
 
 	if (ff == NULL)
-		return -1;
+		return HP41_ERROR;
 
 	if (path != NULL) {
 		ffd = (struct _finddata_t *)ff->data;
 		hFind = _findfirst(path, ffd);
-		if (hFind != -1L) {
-			while (ret == 0 &&
+		if (hFind != HP41_LONG_ERROR) {
+			while (ret == HP41_OK &&
 				(ffd->size == 0 ||
-				strcmp(ffd->name, ".") == 0 ||
-				strcmp(ffd->name, "..") == 0)) {
+				strcmp(ffd->name, ".") == HP41_OK ||
+				strcmp(ffd->name, "..") == HP41_OK)) {
 				ret = _findnext(hFind, ffd);
 			} 
-			if (ret)
+			if (ret != HP41_OK)
 				_findclose(hFind);
 			else {
 				ff->name = ffd->name;
 				ff->size = ffd->size;
 				ff->phandle = (void *)hFind;
-				return 0;
+				return HP41_OK;
 			}
 		}
 	}
 
-	ff->phandle = (void *)-1L;
-	return -1;
+	ff->phandle = (void *)HP41_LONG_ERROR;
+	return HP41_ERROR;
 #endif
 }
 
@@ -779,8 +1225,8 @@ int findfile_next(FIND_FILE *ff)
 			do {
 				ffd = readdir(pdir);
 				if (ffd != NULL && 
-					strcmp(ffd->d_name, ".") != 0 &&
-					strcmp(ffd->d_name, "..") != 0) {
+					strcmp(ffd->d_name, ".") != HP41_OK &&
+					strcmp(ffd->d_name, "..") != HP41_OK) {
 					/* append filespec */
 					strcpy(f_path, ff->data.dir_path);
 					strcat(f_path, ffd->d_name);
@@ -789,19 +1235,19 @@ int findfile_next(FIND_FILE *ff)
 					f_pdir = opendir(f_path);
 					if (f_pdir != NULL)
 						closedir(f_pdir);
-					else if (file_access(f_path, FILE_EXIST) != -1 &&	
-						stat(f_path, &f_stats) == 0 && f_stats.st_size &&
-						matching_file_ext(f_path, ff->data.file_ext) == 0) {
+					else if (file_access(f_path, FILE_EXIST) != HP41_ERROR &&
+						stat(f_path, &f_stats) == HP41_OK && f_stats.st_size &&
+						matching_file_ext(f_path, ff->data.file_ext) == HP41_OK) {
 						/* found next file in directory */
 						ff->name = ffd->d_name;
 						ff->size = f_stats.st_size;
-						return 0;
+						return HP41_OK;
 					}
 				}
 			} while (ffd != NULL);
 		}
 	}
-	return -1;
+	return HP41_ERROR;
 #else	/* _MSC_VER */
 	struct _finddata_t *ffd;
 	intptr_t hFind;
@@ -809,22 +1255,22 @@ int findfile_next(FIND_FILE *ff)
 
 	if (ff != NULL) {
 		hFind = (intptr_t)ff->phandle;
-		if (hFind != -1L) {
+		if (hFind != HP41_LONG_ERROR) {
 			ffd = (struct _finddata_t *)ff->data;
 			do {
 				ret = _findnext(hFind, ffd);
-			} while (ret == 0 &&
+			} while (ret == HP41_OK &&
 				(ffd->size == 0 ||
-				strcmp(ffd->name, ".") == 0 ||
-				strcmp(ffd->name, "..") == 0));
-			if (ret == 0) {
+				strcmp(ffd->name, ".") == HP41_OK ||
+				strcmp(ffd->name, "..") == HP41_OK));
+			if (ret == HP41_OK) {
 				ff->name = ffd->name;
 				ff->size = ffd->size;
 			}
 			return ret;
 		}
 	}
-	return -1;
+	return HP41_ERROR;
 #endif
 }
 
@@ -845,9 +1291,9 @@ void findfile_close(FIND_FILE *ff)
 
 	if (ff != NULL) {
 		hFind = (intptr_t)ff->phandle;
-		if (hFind != -1L) {
+		if (hFind != HP41_LONG_ERROR) {
 			_findclose(hFind);
-			ff->phandle = (void *)-1L;
+			ff->phandle = (void *)HP41_LONG_ERROR;
 		}
 	}
 #endif
@@ -925,7 +1371,7 @@ char *to_unix_path(char *p)
 {
 	if (p != NULL) {
 		char *pp = p;
-		while (*pp != 0) {
+		while (*pp != '\0') {
 			if (*pp == '\\')
 				*pp = '/';
 			++pp;
@@ -995,7 +1441,7 @@ int matching_file_ext(char *cur_path, char *new_ext)
 		return strcmp(ext, new_ext);
 	}
 
-	return 0;
+	return HP41_OK;
 }
 
 void getfullpath(char *fullpath, char *dirpath, char *filespec)
@@ -1080,16 +1526,16 @@ void file_splitpath(
 
 void help(int do_help)
 {
-	int decompiler = 0;
+	int decompiler = HP41_FALSE;
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.43\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.44\n");
 		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");
 		printf("  P41 [ /p ]: archive file for HP-41 programs on ftp sites\n");
-		printf("  RAW [ /r ]: input/output file for LIFUTIL\n");
+		printf("  RAW [ /r ]: input/output file for V41 abd LIFUTILS\n");
 		printf("  DAT [ /d ]: input/output file for EMU41 (using INP, OUTP)\n");
 		printf("  BIN [ /b ]: output file from 41UCC\n");
 		printf("  TXT [ /t ]: program listing (text)\n");
@@ -1115,18 +1561,18 @@ void help(int do_help)
 		printf("  [trailer] - filler bytes, so that filesize = multiple 128-byte blocks\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" BIN file(s) to LIF file ( LIF name = <name> or [infile] )\n");
-		printf("   /b=infile<.bin>  /l<=outfile.lif>  <name>\n\n");
+		printf("   /b=infile<.bin>  /l<=outfile<.lif>>  <name>\n\n");
 		printf(" BIN file to P41 file ( P41 name = <name> or [infile] )\n");
-		printf("   /b=infile<.bin>  /p<=outfile.p41>  <name>\n\n");
+		printf("   /b=infile<.bin>  /p<=outfile<.p41>>  <name>\n\n");
 		printf(" BIN file to RAW file ( remove 2-byte header )\n");
-		printf("   /b=infile<.bin>  /r<=outfile.raw>  </k>\n");
+		printf("   /b=infile<.bin>  /r<=outfile<.raw>> </k>\n");
 		printf("  Use /k option to exclude checksum and trailer bytes in RAW file\n\n");
 		printf(" BIN file to DAT file ( hex digits in ASCII format )\n");
-		printf("   /b=infile<.bin>  /d<=outfile.dat>\n\n");
+		printf("   /b=infile<.bin>  /d<=outfile<.dat>>\n\n");
 		printf(" BIN file to TXT file ( de-compile )\n");
-		printf("   /b=infile<.bin>  /t<=outfile.txt>  </a>  </n>  </x>\n");
+		printf("   /b=infile<.bin>  /t<=outfile<.txt>> </a> </n> </x> </m=file<.txt>> \n");
 
-		decompiler = 1;
+		decompiler = HP41_TRUE;
 		break;
 
 	case 'D':
@@ -1137,16 +1583,16 @@ void help(int do_help)
 		printf(" All bytes are hex digits in ASCII format.\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" DAT file(s) to LIF file ( LIF name = <name> or [infile] )\n");
-		printf("   /d=infile<.dat>  /l<=outfile.lif>  <name>\n\n");
+		printf("   /d=infile<.dat>  /l<=outfile<.lif>>  <name>\n\n");
 		printf(" DAT file to P41 file ( P41 name = <name> or [infile] )\n");
-		printf("   /d=infile<.dat>  /p<=outfile.p41>  <name>\n\n");
+		printf("   /d=infile<.dat>  /p<=outfile<.p41>>  <name>\n\n");
 		printf(" DAT file to RAW file ( remove 2-byte header )\n");
-		printf("   /d=infile<.dat>  /r<=outfile.raw>  </k>\n");
+		printf("   /d=infile<.dat>  /r<=outfile<.raw>> </k>\n");
 		printf("  Use /k option to exclude checksum and trailer bytes in RAW file\n\n");
 		printf(" DAT file to TXT file ( de-compile )\n");
-		printf("   /d=infile<.dat>  /t<=outfile.txt>  </a>  </n>  </x>\n");
+		printf("   /d=infile<.dat>  /t<=outfile<.txt>> </a> </n> </x> </m=file<.txt>> \n");
 
-		decompiler = 1;
+		decompiler = HP41_TRUE;
 		break;
 
 	case 'L':
@@ -1156,18 +1602,18 @@ void help(int do_help)
 		printf("The HPDir Project: http://www.hp9845.net/9845/projects/hpdir/\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" LIF file to P41 file ( search LIF name: <name>, <outfile> or [infile] )\n");
-		printf("   /l=infile<.lif>  /p<=outfile.p41>  <name>\n\n");
+		printf("   /l=infile<.lif>  /p<=outfile<.p41>>  <name>\n\n");
 		printf(" LIF file to RAW file\n");
-		printf("   /l=infile<.lif>  /r<=outfile.raw>  <name>  </k>\n");
+		printf("   /l=infile<.lif>  /r<=outfile<.raw>>  <name>  </k>\n");
 		printf("  Use /k option to exclude checksum and trailer bytes in RAW file\n\n");
 		printf(" LIF file to DAT file ( hex digits in ASCII format )\n");
-		printf("   /l=infile<.lif>  /d<=outfile.dat>  <name>\n\n");
+		printf("   /l=infile<.lif>  /d<=outfile<.dat>>  <name>\n\n");
 		printf(" LIF directory listing ( search for <name> only, if specified )\n");
 		printf("   /l=infile<.lif>  <name>\n\n");
 		printf(" LIF file to TXT file ( de-compile )\n");
-		printf("   /l=infile<.lif>  /t<=outfile.txt>  <name>  </a>  </n>  </x>\n");
+		printf("   /l=infile<.lif>  /t<=outfile<.txt>>  <name> </a> </n> </x> </m=file<.txt>> \n");
 
-		decompiler = 1;
+		decompiler = HP41_TRUE;
 		break;
 
 	case 'P':
@@ -1178,16 +1624,16 @@ void help(int do_help)
 		printf("  [trailer] - filler bytes, so that filesize = 32 + multiple 256-byte blocks\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" P41 file(s) to LIF file\n");
-		printf("   /p=infile<.p41>  /l<=outfile.lif>\n\n");
+		printf("   /p=infile<.p41>  /l<=outfile<.lif>>\n\n");
 		printf(" P41 file to RAW file ( remove 32-byte header )\n");
-		printf("   /p=infile<.p41>  /r<=outfile.raw>  </k>\n");
+		printf("   /p=infile<.p41>  /r<=outfile<.raw>> </k>\n");
 		printf("  Use /k option to exclude checksum and trailer bytes in RAW file\n\n");
 		printf(" P41 file to DAT file ( hex digits in ASCII format )\n");
-		printf("   /p=infile<.p41>  /d<=outfile.dat>\n\n");
+		printf("   /p=infile<.p41>  /d<=outfile<.dat>>\n\n");
 		printf(" P41 file to TXT file ( de-compile )\n");
-		printf("   /p=infile<.p41>  /t<=outfile.txt>  </a>  </n>  </x>\n");
+		printf("   /p=infile<.p41>  /t<=outfile<.txt>> </a> </n> </x> </m=file<.txt>> \n");
 
-		decompiler = 1;
+		decompiler = HP41_TRUE;
 		break;
 
 	case 'R':
@@ -1197,37 +1643,40 @@ void help(int do_help)
 		printf("  [trailer] - filler bytes, so that filesize = multiple 256-byte blocks\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" RAW file(s) to LIF file ( LIF name = <name> or [infile] )\n");
-		printf("   /r=infile<.raw>  /l<=outfile.lif>  <name>\n\n");
+		printf("   /r=infile<.raw>  /l<=outfile<.lif>  <name>\n\n");
 		printf(" RAW file to P41 file ( P41 name = <name> or [infile] ) \n");
-		printf("   /r=infile<.raw>  /p<=outfile.p41>  <name>\n\n");
+		printf("   /r=infile<.raw>  /p<=outfile<.p41>>  <name>\n\n");
 		printf(" RAW file to DAT file ( hex digits in ASCII format )\n");
-		printf("   /r=infile<.raw>  /d<=outfile.dat>\n\n");
+		printf("   /r=infile<.raw>  /d<=outfile<.dat>>\n\n");
 		printf(" RAW file to TXT file ( de-compile )\n");
-		printf("   /r=infile<.raw>  /t<=outfile.txt>  </a>  </n>  </x>\n");
+		printf("   /r=infile<.raw>  /t<=outfile<.txt>> </a> </n> </x> </m=file<.txt>> \n");
 
-		decompiler = 1;
+		decompiler = HP41_TRUE;
 		break;
 
 	case 'T':
 		printf("TXT Format - Compiler:\n");
-		printf("1) Prefixes are case-insensitive: [ rcl 00 ] same as [ RCL 00 ]\n");
-		printf("2) Postfixes are case-sensitive: [ lbl a ] different than [ lbl A ]\n");
-		printf("3) Append text is allowed using: [ >\"text\" ],  [ \"|-text\" ], or [ \"\\-text\" ]\n");
-		printf("4) Synthetic instructions are allowed: [ rcl M ], [ sto R ]\n");
-		printf("5) Synthetic NOP (TEXT0) is allowed using an empty string: [ \"\" ]\n");
-		printf("6) Synthetic strings are allowed using C-style esc-sequences: [ \"\\x0D\\x0A\" ]\n");
-		printf("7) Comments are allowed if preceded by [ ; ] or [ # ]: [ # comment ]\n");
-		printf("8) [ /n ] option - ignore line numbers: [ 100 STO 00 ]\n");
-		printf("9) [ /g ] option - global label for[ \"A..J\", \"a..e\" ] if in quotes: [ XEQ \"A\" ]\n\n");
-		printf("Usage: optional parameters are surrounded by <>\n\n");
+		printf(" Prefixes are case-insensitive: [ rcl 00 ] same as [ RCL 00 ]\n");
+		printf(" Postfixes are case-sensitive: [ lbl a ] different than [ lbl A ]\n");
+		printf(" Append text is allowed using: [ >\"text\" ],  [ \"|-text\" ], or [ \"\\-text\" ]\n");
+		printf(" Synthetic instructions are allowed: [ rcl M ], [ sto R ]\n");
+		printf(" Synthetic NOP (TEXT0) is allowed using an empty string: [ \"\" ]\n");
+		printf(" Synthetic strings are allowed using C-style esc-sequences: [ \"\\x0D\\x0A\" ]\n");
+		printf(" Comments are allowed if preceded by [ ; ] or [ # ]: [ # comment ]\n");
+		printf(" [ /n ] - ignore line numbers: [ 100 STO 00 ]\n");
+		printf(" [ /g ] - global label for[ \"A..J\", \"a..e\" ] if in quotes: [ XEQ \"A\" ]\n");
+		printf(" [ /x ] - exclude all supported XROM modules (may require [ XROM mm,ff ])\n");
+		printf(" [ /x## ] - exclude supported XROM module 1..31 (may require [ XROM mm,ff ])\n");
+		printf(" [ /m=file<.txt> ] - import functions from XROM modules in specified text file\n");
+		printf("\nUsage: optional parameters are surrounded by <>\n\n");
 		printf(" TXT file(s) to LIF file ( LIF name = <name> or [infile] )\n");
-		printf("   /t=infile<.txt>  /l<=outfile.lif>  <name>  </g>  </n>\n\n");
+		printf("   /t=infile<.txt>  /l<=outfile<.lif>>  <name> </n> </g> </x> </m=file<.txt>>\n\n");
 		printf(" TXT file to P41 file ( P41 name = <name> or [infile] )\n");
-		printf("   /t=infile<.txt>  /p<=outfile.p41>  <name>  </g>  </n>\n\n");
+		printf("   /t=infile<.txt>  /p<=outfile<.p41>>  <name> </n> </g> </x> </m=file<.txt>>\n\n");
 		printf(" TXT file to RAW file\n");
-		printf("   /t=infile<.txt>  /r<=outfile.raw>  </g>  </k>  </n>\n\n");
+		printf("   /t=infile<.txt>  /r<=outfile<.raw>> </k> </n> </g> </x> </m=file<.txt>> \n\n");
 		printf(" TXT file to DAT file ( hex digits in ASCII format )\n");
-		printf("   /t=infile<.txt>  /d<=outfile.dat>  </g>  </n>\n");
+		printf("   /t=infile<.txt>  /d<=outfile<.dat>> </n> </g> </x> </m=file<.txt>> \n");
 		break;
 
 	case 'W':
@@ -1237,21 +1686,21 @@ void help(int do_help)
 
 		if (bc_printer == PRINTER_HP) {
 			printf(" RAW file to PCL (HP raster graphics) file\n");
-			printf("   /r=infile<.raw>  /h<=outfile.pcl>  <\"Program Title\">\n\n");
+			printf("   /r=infile<.raw>  /h<=outfile<.pcl>>  <\"Program Title\">\n\n");
 			printf("To print the barcode, copy the output file to the printer device.\n");
 			printf("Example: hp41uc /r=prog.raw /h \"Program Title\"\n");
 			printf("         copy /b prog.pcl lpt1\n");
 		}
 		else if (bc_printer == PRINTER_POSTCRIPT) {
 			printf(" RAW file to Postcript file\n");
-			printf("   /r=infile<.raw>  /s<=outfile.ps>  <\"Program Title\">\n\n");
+			printf("   /r=infile<.raw>  /s<=outfile<.ps>>  <\"Program Title\">\n\n");
 			printf("To print the barcode, copy the output file to the printer device.\n");
 			printf("Example: hp41uc /r=prog.raw /s \"Program Title\"\n");
 			printf("         copy /b prog.ps lpt1\n");
 		}
 		else {
 			printf(" RAW file to Wand (barcode) file\n");
-			printf("   /r=infile<.raw>  /w<=outfile.wnd>  <\"Program Title\">\n\n");
+			printf("   /r=infile<.raw>  /w<=outfile<.wnd>>  <\"Program Title\">\n\n");
 			printf("The output file will be a 16-byte per row hex-dump in text format.\n\n");
 		}
 		break;
@@ -1264,8 +1713,9 @@ void help(int do_help)
 		printf("\nDe-compiler Options:\n");
 		printf("  /a - append text using: [ \"|-text\" ], instead of: [ >\"text\" ]\n");
 		printf("  /n - generate line numbers\n");
-		printf("  /x - use [ XROM mm,ff ] for all XROM Functions\n");
-		printf("  /x## - for ## = 1..31, use [ XROM ##,ff ]: [ XROM 25,46 ], instead of [ X<>F ]\n");
+		printf("  /x - exclude all supported XROM modules (may generate [ XROM mm,ff ])\n");
+		printf("  /x## - exclude supported XROM module 1..31 (may generate [ XROM mm,ff ])\n");
+		printf("  /m=file<.txt> - import functions from XROM modules in specified text file\n");
 	}
 }
 
