@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -80,6 +80,10 @@ int main(int argc, char *argv[])
 			_stricmp(argv[i], "/a") == HP41_OK) {
 			text_append = HP41_TRUE;
 		}
+    else if (_stricmp(argv[i], "-f") == HP41_OK ||
+      _stricmp(argv[i], "/f") == HP41_OK) {
+      skip_line_feed = HP41_TRUE;
+    }
 		else if (_stricmp(argv[i], "-g") == HP41_OK ||
 			_stricmp(argv[i], "/g") == HP41_OK) {
 			force_global = HP41_TRUE;
@@ -1530,8 +1534,8 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 2.44\n");
-		printf("Copyright (c) Leo Duran, 2000-2016. All rights reserved. leo.duran@yahoo.com.\n\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 3.00\n");
+		printf("Copyright (c) Leo Duran, 2000-2020. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");
 		printf("  P41 [ /p ]: archive file for HP-41 programs on ftp sites\n");
@@ -1597,9 +1601,8 @@ void help(int do_help)
 
 	case 'L':
 		printf("LIF Format:\n");
-		printf("File structure used for HP-IL mass-storage devices.\n");
-		printf("LIF: https://www.finseth.com/hpdata/lif.phpl\n");
-		printf("The HPDir Project: http://www.hp9845.net/9845/projects/hpdir/\n\n");
+		printf("HP-IL Files: Where, What, Why, How, etc.:\n https://www.hpmuseum.org/cgi-sys/cgiwrap/hpmuseum/articles.cgi?read=24\n");
+		printf("The HPDir Project:\n http://www.hp9845.net/9845/projects/hpdir/\n\n");
 		printf("Usage: optional parameters are surrounded by <>\n\n");
 		printf(" LIF file to P41 file ( search LIF name: <name>, <outfile> or [infile] )\n");
 		printf("   /l=infile<.lif>  /p<=outfile<.p41>>  <name>\n\n");
@@ -1712,6 +1715,7 @@ void help(int do_help)
 	if (decompiler) {
 		printf("\nDe-compiler Options:\n");
 		printf("  /a - append text using: [ \"|-text\" ], instead of: [ >\"text\" ]\n");
+    printf("  /f - skip line-feed (0x0A) characters on DAT files\n");
 		printf("  /n - generate line numbers\n");
 		printf("  /x - exclude all supported XROM modules (may generate [ XROM mm,ff ])\n");
 		printf("  /x## - exclude supported XROM module 1..31 (may generate [ XROM mm,ff ])\n");

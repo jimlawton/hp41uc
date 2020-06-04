@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -24,6 +24,7 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "hp41uc.h"
+#define DAT_ASCII_HEADER_SIZE   4
 
 void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name)
 {
@@ -503,10 +504,13 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 {
 	size_t blkcnt, incnt;
 	size_t inblk, outblk;
+	size_t remain;
 	size_t i, j, k;
 	long size;
+	long seekpos;
 	int pending, end;
 	unsigned char *inbuf;
+	unsigned char *datbuf;
 
 	/* program length in blocks */
 	blkcnt = (size_t)inlength / 512;
@@ -519,7 +523,8 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 	}
 
 	/* init program size */
-	size = inlength / 2;
+	size = 0;
+	seekpos = DAT_ASCII_HEADER_SIZE;
 
 	/* copy blocks */
 	inblk = sizeof(buf_512);
@@ -531,18 +536,33 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 		if (inlength < sizeof(buf_512))
 			inblk = (size_t)inlength;
 
-		/* read block */
-		if (fread(buf_512, 1, inblk, fin) != inblk) {
-			inblk = 0;
-			printf("Error reading from[ %s ]\n", inpath);
+		remain = inblk;
+		datbuf = buf_512;
+		while (inblk && remain) {
+			/* read block */
+			if (fread(datbuf, 1, remain, fin) != remain) {
+				inblk = 0;
+				printf("Error reading from[ %s ]\n", inpath);
+			}
+			else {
+				/* validate hex digits */
+				if ((j = nonxdigit_buffer(datbuf, remain))) {
+					seekpos += j;
+					remain -= (j - 1);
+					datbuf = &buf_512[inblk - remain];
+
+					/* point past LF in the input file */
+					fseek(fin, seekpos, SEEK_SET);
+					printf(" Warning: Skipped Line-Feed (0x0A) character at offset[ %ld ]\n", seekpos - 1);
+				}
+				else {
+					seekpos += remain;
+					remain = 0;
+				}
+			}
 		}
-		/* validate hex digits */
-		else if ((j = nonxdigit_buffer(buf_512, inblk))) {
-			inblk = 0;
-			printf("Error: invalid ASCII hex-digit[ %02X ] at offset[ %ld ]\n",
-				buf_512[j - 1], (size * 2) - inlength + j + 4 - 1);
-		}
-		else {
+
+		if (inblk) {
 			/* convert ASCII to hex */
 			j = asciitohex(buf1_256, buf_512, inblk);
 
@@ -550,7 +570,7 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			outblk = seek_end(buf1_256, j);
 			if (outblk) {
 				/* adjust program size */
-				size += outblk - inlength / 2;
+				size += outblk - inblk / 2;
 
 				/* last input block */
 				inlength = 0;
@@ -558,6 +578,7 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			else {
 				inlength -= inblk;
 				outblk = inblk / 2;
+				size += inblk / 2;
 			}
 
 			/* update start block */
@@ -947,6 +968,7 @@ long read_dat_size(FILE *fin, char *inpath, long length)
 	/* convert ASCII to hex */
 	asciitohex(buffer2, buffer4, 4);
 
+
 	/* get program size */
 	return(get_lif_size(buffer2, length / 2) * 2);
 }
@@ -1160,7 +1182,7 @@ long get_lif_size(unsigned char *buffer2, long length)
 
 	/* get program size */
 	puc = (unsigned char *)&size;
-	puc[3] = puc[2] = 0;
+	size = 0L;
 	puc[1] = buffer2[0];
 	puc[0] = buffer2[1];
 	if (size == 0 || size > length)
