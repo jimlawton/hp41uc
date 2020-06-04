@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */

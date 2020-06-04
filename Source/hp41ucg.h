@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2016.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -37,6 +37,7 @@ char ext[_MAX_EXT];
 int line_numbers = HP41_FALSE;
 int text_append = HP41_FALSE;
 int force_global = HP41_FALSE;
+int skip_line_feed = HP41_FALSE;
 int raw_checksum = HP41_TRUE;
 
 char ascii[80];
