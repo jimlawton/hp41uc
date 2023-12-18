@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2023.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -720,7 +720,7 @@ char *get_xrom_function(char *name)
 
 	str = name;
 	if (name) {
-		n = strlen(name);
+		n = (int)strlen(name);
 		/* remove quotes */
 		if (n > 1 && name[0] == '\"' && name[n - 1] == '\"') {
 			name[n - 1] = '\0';
@@ -1534,8 +1534,8 @@ void help(int do_help)
 
 	switch (do_help) {
 	case 1:
-		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 3.00\n");
-		printf("Copyright (c) Leo Duran, 2000-2020. All rights reserved. leo.duran@yahoo.com.\n\n");
+		printf("User-Code File Converter/Compiler/De-compiler/Barcode Generator - Version 3.01\n");
+		printf("Copyright (c) Leo Duran, 2000-2023. All rights reserved. leo.duran@yahoo.com.\n\n");
 		printf("Supported File Formats:\n");
 		printf("  LIF [ /l ]: transfer file for Trans41\n");
 		printf("  P41 [ /p ]: archive file for HP-41 programs on ftp sites\n");

@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2023.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -482,7 +482,7 @@ int decompile(unsigned char *pout_buffer, int out_size,
 					++line;
 					if (line > 1999)
 						line = 1;
-					j = strlen((char *)buffer6);
+					j = (int)strlen((char *)buffer6);
 					memcpy(out_buffer, buffer6, j);
 					out_buffer += j;
 					produced += j;
@@ -698,7 +698,7 @@ int copy_prefix(char *prefix, int out_size)
 {
 	int j, n;
 
-	n = strlen(prefix);
+	n = (int)strlen(prefix);
 	j = produced + n;
 	if (line_numbers && !numeric) {
 		if (line > 999)
@@ -717,7 +717,7 @@ int copy_prefix(char *prefix, int out_size)
 		++line;
 		if (line > 1999)
 			line = 1;
-		j = strlen((char *)buffer6);
+		j = (int)strlen((char *)buffer6);
 		memcpy(out_buffer, buffer6, j);
 		out_buffer += j;
 		produced += j;
@@ -736,8 +736,8 @@ int copy_prefix2(char *prefix1, char *prefix2, int out_size)
 {
 	int j, n, m;
 
-	n = strlen(prefix1);
-	m = strlen(prefix2);
+	n = (int)strlen(prefix1);
+	m = (int)strlen(prefix2);
 	j = produced + n + m;
 	if (line_numbers) {
 		if (line > 999)
@@ -756,7 +756,7 @@ int copy_prefix2(char *prefix1, char *prefix2, int out_size)
 		++line;
 		if (line > 1999)
 			line = 1;
-		j = strlen((char *)buffer6);
+		j = (int)strlen((char *)buffer6);
 		memcpy(out_buffer, buffer6, j);
 		out_buffer += j;
 		produced += j;
@@ -777,7 +777,7 @@ int copy_postfix(char *postfix, int out_size)
 {
 	int j, n;
 
-	n = strlen(postfix);
+	n = (int)strlen(postfix);
 	j = produced + n;
 	if (j > out_size)
 		return 0;
@@ -795,8 +795,8 @@ int copy_postfix2(char *postfix1, char *postfix2, int out_size)
 {
 	int j, n, m;
 
-	n = strlen(postfix1);
-	m = strlen(postfix2);
+	n = (int)strlen(postfix1);
+	m = (int)strlen(postfix2);
 	j = produced + n + m;
 	if (j > out_size)
 		return 0;
@@ -824,7 +824,7 @@ int room_for_key(unsigned char *buffer, int count)
 	if (buffer[0] >= 0xC0 && buffer[0] <= 0xCD &&
 		buffer[2] > 0xF1 && buffer[3] && count > 4) {
 		row = buffer[3] & 0x0F;
-		return((row > 0 && row < 9) ? strlen((char *)pKey) : strlen((char *)psKey));
+		return((row > 0 && row < 9) ? (int)strlen((char *)pKey) : (int)strlen((char *)psKey));
 	}
 
 	return(0);

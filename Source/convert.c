@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2023.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -25,6 +25,8 @@ along with HP41UC.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "hp41uc.h"
 #define DAT_ASCII_HEADER_SIZE   4
+#define LIF_HP41_PRG           0x80E0
+#define LIF_HP41_DAT            0xD0E0
 
 void convert(char *infile, FILE_DESC *pin, char *outfile, FILE_DESC *pout, char *name)
 {
@@ -247,7 +249,8 @@ void copy_file(FILE *fout, char *outpath,
 {
 	unsigned char *puc;
 	unsigned char chksum;
-	long lsize, dirblk;
+	long lsize, dirblk, regs;
+
 	/* copy_file() may be called multiple times for the same LIF output file */
 	static long startblk;
 	static long dirpos;
@@ -258,12 +261,18 @@ void copy_file(FILE *fout, char *outpath,
 			&lsize, &chksum, NULL,
 			fin, inpath, indtype, inlength)) {
 
+			/* how many 7-byte registers? */
+			regs = lsize / 7;
+			if (regs * 7 < lsize) {
+				++regs;
+			}
+
 			/* write cheksum block */
 			if (!raw_checksum ||
 				write_raw_checksum(fout, outpath, poutlength,
 				buf1_256, 256, chksum)) {
-				printf(" size[ %04X ]  ( %ld bytes )\n",
-					(unsigned short)lsize, lsize);
+				printf(" Size[ %04X ]  ( %ld bytes ) - Registers Needed[ %ld ]\n",
+					(unsigned short)lsize, lsize, regs);
 			}
 		}
 	}
@@ -274,13 +283,19 @@ void copy_file(FILE *fout, char *outpath,
 			&lsize, &chksum, NULL,
 			fin, inpath, indtype, inlength)) {
 
+			/* how many 7-byte registers? */
+			regs = lsize / 7;
+			if (regs * 7 < lsize) {
+				++regs;
+			}
+
 			/* write cheksum block */
 			puc = (unsigned char *)&lsize;
 			chksum += puc[0] + puc[1];
 			if (write_raw_checksum(fout, outpath, poutlength,
 				buf1_256, 128, chksum)) {
-				printf(" size[ %04X ]  ( %ld bytes )\n",
-					(unsigned short)lsize, lsize);
+				printf(" Size[ %04X ]  ( %ld bytes ) - Registers Needed[ %ld ]\n",
+					(unsigned short)lsize, lsize, regs);
 			}
 		}
 
@@ -336,13 +351,19 @@ void copy_file(FILE *fout, char *outpath,
 			&lsize, &chksum, NULL,
 			fin, inpath, indtype, inlength)) {
 
+			/* how many 7-byte registers? */
+			regs = lsize / 7;
+			if (regs * 7 < lsize) {
+				++regs;
+			}
+
 			/* write cheksum */
 			puc = (unsigned char *)&lsize;
 			chksum += puc[0] + puc[1];
 			if (write_dat_checksum(fout, outpath,
 				poutlength, chksum)) {
-				printf(" size[ %04X ]  ( %ld bytes )\n",
-					(unsigned short)lsize, lsize);
+				printf(" Size[ %04X ]  ( %ld bytes ) - Registers Needed[ %ld ]\n",
+					(unsigned short)lsize, lsize, regs);
 			}
 		}
 
@@ -406,7 +427,7 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 	size = inlength;
 
 	/* copy blocks */
-	inblk = sizeof(buf1_256);
+	inblk = (size_t)sizeof(buf1_256);
 	memset(buf1_256, 0, sizeof(buf1_256));
 	if (outdtype == DATA_TXT)
 		decompile_init();
@@ -422,16 +443,16 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 		}
 		else {
 			/* check for END in block */
-			outblk = seek_end(buf1_256, inblk);
+			outblk = seek_end(buf1_256, (int)inblk);
 			if (outblk) {
 				/* adjust program size */
-				size += outblk - inlength;
+				size += (long)outblk - inlength;
 
 				/* last input block */
 				inlength = 0;
 			}
 			else {
-				inlength -= inblk;
+				inlength -= (long)inblk;
 				outblk = inblk;
 			}
 
@@ -457,7 +478,7 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 						&inbuf, (int *)&incnt, &pending, &end);
 					if (j) {
 						k = fwrite(buf_1024, 1, j, fout);
-						*poutlength += k;
+						*poutlength += (long)k;
 						if (k != j) {
 							inblk = 0;
 							printf("Error writing to[ %s ]\n", outpath);
@@ -470,9 +491,9 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 				} while (inblk && (incnt || (pending && !inlength)));
 			}
 			else if (outdtype == DATA_DAT) {
-				j = hextoascii(buf_512, buf1_256, outblk);
+				j = hextoascii(buf_512, buf1_256, (int)outblk);
 				k = fwrite(buf_512, 1, j, fout);
-				*poutlength += k;
+				*poutlength += (long)k;
 				if (k != j) {
 					inblk = 0;
 					printf("Error writing to[ %s ]\n", outpath);
@@ -480,7 +501,7 @@ int copy_raw_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			}
 			else {  /* DATA_RAW */
 				j = fwrite(buf1_256, 1, outblk, fout);
-				*poutlength += j;
+				*poutlength += (long)j;
 				if (j != outblk) {
 					inblk = 0;
 					printf("Error writing to[ %s ]\n", outpath);
@@ -546,8 +567,8 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			}
 			else {
 				/* validate hex digits */
-				if ((j = nonxdigit_buffer(datbuf, remain))) {
-					seekpos += j;
+				if ((j = nonxdigit_buffer(datbuf, (int)remain))) {
+					seekpos += (long)j;
 					remain -= (j - 1);
 					datbuf = &buf_512[inblk - remain];
 
@@ -556,7 +577,7 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 					printf(" Warning: Skipped Line-Feed (0x0A) character at offset[ %ld ]\n", seekpos - 1);
 				}
 				else {
-					seekpos += remain;
+					seekpos += (long)remain;
 					remain = 0;
 				}
 			}
@@ -564,21 +585,21 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 
 		if (inblk) {
 			/* convert ASCII to hex */
-			j = asciitohex(buf1_256, buf_512, inblk);
+			j = asciitohex(buf1_256, buf_512, (int)inblk);
 
 			/* check for END in block */
-			outblk = seek_end(buf1_256, j);
+			outblk = seek_end(buf1_256, (int)j);
 			if (outblk) {
 				/* adjust program size */
-				size += outblk - inblk / 2;
+				size += (long)(outblk - inblk / 2);
 
 				/* last input block */
 				inlength = 0;
 			}
 			else {
-				inlength -= inblk;
+				inlength -= (long)inblk;
 				outblk = inblk / 2;
-				size += inblk / 2;
+				size += (long)(inblk / 2);
 			}
 
 			/* update start block */
@@ -603,7 +624,7 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 						&inbuf, (int *)&incnt, &pending, &end);
 					if (j) {
 						k = fwrite(buf_1024, 1, j, fout);
-						*poutlength += k;
+						*poutlength += (long)k;
 						if (k != j) {
 							inblk = 0;
 							printf("Error writing to[ %s ]\n", outpath);
@@ -617,7 +638,7 @@ int copy_dat_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			}
 			else {  /* DATA_RAW */
 				j = fwrite(buf1_256, 1, outblk, fout);
-				*poutlength += j;
+				*poutlength += (long)j;
 				if (j != outblk) {
 					inblk = 0;
 					printf("Error writing to[ %s ]\n", outpath);
@@ -679,7 +700,7 @@ int copy_txt_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			printf("Error reading from[ %s ]\n", inpath);
 		}
 		else {
-			inlength -= inblk;
+			inlength -= (long)inblk;
 			inbuf = buf_1024;
 			incnt = inblk;
 			do {
@@ -694,12 +715,12 @@ int copy_txt_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 				}
 				else if (outblk) {
 					/* update program size */
-					size += outblk;
+					size += (long)outblk;
 
 					/* limit output @ 64K */
 					if (size > 65535 ||
 						(size > 65532 && flag != COMPILE_FLAG_END)) {
-						size -= outblk;
+						size -= (long)outblk;
 						max = 1;
 					}
 
@@ -712,7 +733,7 @@ int copy_txt_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 
 						/* write block */
 						if (outdtype == DATA_DAT) {
-							j = hextoascii(buf_512, buf1_256, outblk);
+							j = hextoascii(buf_512, buf1_256, (int)outblk);
 							outbuf = buf_512;
 						}
 						else {  /* DATA_RAW */
@@ -720,7 +741,7 @@ int copy_txt_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 							outbuf = buf1_256;
 						}
 						k = fwrite(outbuf, 1, j, fout);
-						*poutlength += k;
+						*poutlength += (long)k;
 						if (k != j) {
 							inblk = 0;
 							printf("Error writing to[ %s ]\n", outpath);
@@ -767,8 +788,8 @@ int copy_txt_blocks(FILE *fout, char *outpath, DATA_TYPE outdtype,
 			outbuf = buf1_256;
 		}
 		k = fwrite(outbuf, 1, j, fout);
-		*poutlength += k;
-		size += k;
+		*poutlength += (long)k;
+		size += (long)k;
 		if (k != j) {
 			inblk = 0;
 			printf("Error writing to[ %s ]\n", outpath);
@@ -803,7 +824,7 @@ long write_raw_checksum(FILE *fout, char *outpath, long *poutlength,
 	buffer[0] = chksum;
 
 	/* write checksum block */
-	n = fwrite(buffer, 1, (size_t)r, fout);
+	n = (long)fwrite(buffer, 1, (size_t)r, fout);
 	*poutlength += n;
 	if (n != r) {
 		printf("Error writing to[ %s ]\n", outpath);
@@ -824,7 +845,7 @@ long write_dat_checksum(FILE *fout, char *outpath,
 	hextoascii(buffer2, &chksum, 1);
 
 	/* write checksum bytes */
-	n = fwrite(buffer2, 1, 2, fout);
+	n = (long)fwrite(buffer2, 1, 2, fout);
 	*poutlength += n;
 	if (n != 2) {
 		printf("Error writing to[ %s ]\n", outpath);
@@ -843,7 +864,7 @@ long write_raw_size(FILE *fout, long size)
 	puc = (unsigned char *)&size;
 	buffer2[0] = puc[1];
 	buffer2[1] = puc[0];
-	return(fwrite(buffer2, 1, 2, fout));
+	return((long)fwrite(buffer2, 1, 2, fout));
 }
 
 long write_dat_size(FILE *fout, long size)
@@ -857,7 +878,7 @@ long write_dat_size(FILE *fout, long size)
 	buffer2[0] = puc[1];
 	buffer2[1] = puc[0];
 	hextoascii(buffer4, buffer2, 2);
-	return(fwrite(buffer4, 1, 4, fout));
+	return((long)fwrite(buffer4, 1, 4, fout));
 }
 
 void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
@@ -891,7 +912,7 @@ void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
 				/* list directory */
 				++entries;
 				if (entries == 1) {
-					printf(" name        type  size  implementation\n");
+					printf(" Name        Type  Size  Implementation\n");
 					printf(" --------------------------------------\n");
 				}
 				printf(" ");
@@ -901,12 +922,13 @@ void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
 				for (i = 10; i < 12; ++i)
 					printf("%02X", dir[i]);
 				printf("  ");
-				if (*pus == 0x80E0) {
+				if (*pus == LIF_HP41_PRG || *pus == LIF_HP41_DAT) {
 					for (i = 28; i < 30; ++i)
 						printf("%02X", dir[i]);
 				}
-				else
+				else {
 					printf("xxxx");
+				}
 				printf("  ");
 				for (i = 28; i < 32; ++i)
 					printf("%02X", dir[i]);
@@ -918,18 +940,27 @@ void dump_lif_dir(FILE *fin, char *inpath, long count, char *name)
 	if (entries == 0 && *pname != '\0') {
 		printf("No match found for name[ %s ], in file [ %s ]\n", pname, inpath);
 	}
-	else if (entries) {
+	else {
 		printf("%ld directory entries found.\n", entries);
 	}
 }
 
 void show_lif_info(char *name, long size)
 {
+	long regs;
+
+	/* how many 7-byte registers? */
+	regs = size / 7;
+	if (regs * 7 < size) {
+		++regs;
+	}
+
 	if (name)
-		printf(" name[ %s ]\n", name);
-	printf(" type[ E080 ]\n");
-	printf(" size[ %04X ]  ( %ld bytes )\n", (unsigned short)size, size);
-	printf(" implementation[ %04X0020 ]\n", (unsigned short)size);
+		printf(" Name[ %s ]\n", name);
+	printf(" Type[ E080 ]\n");
+	printf(" Size[ %04X ]  ( %ld bytes ) - Registers Needed[ %ld ]\n",
+		(unsigned short)size, size, regs);
+	printf(" Implementation[ %04X0020 ]\n", (unsigned short)size);
 }
 
 long read_bin_size(FILE *fin, char *inpath, long length)
@@ -1247,16 +1278,16 @@ long write_lif_hdr(FILE *fout, long *pstartblk, long *pdirpos, int files)
 	buf1_256[19] = (unsigned char)blk;
 
 	/* write header at block[0], and filler (0) at block[1] */
-	length = fwrite(buf1_256, 1, sizeof(buf1_256), fout);
+	length = (long)fwrite(buf1_256, 1, sizeof(buf1_256), fout);
 	memset(buf1_256, 0, sizeof(lifhdr));
-	length += fwrite(buf1_256, 1, sizeof(buf1_256), fout);
+	length += (long)fwrite(buf1_256, 1, sizeof(buf1_256), fout);
 	*pdirpos = length;
 
 	/* write empty directory blocks ( filled with 0xFF ) */
 	startblk = 2;
 	memset(buf1_256, 0xFF, sizeof(buf1_256));
 	for (i = 0; i < blk; ++i) {
-		length += fwrite(buf1_256, 1, sizeof(buf1_256), fout);
+		length += (long)fwrite(buf1_256, 1, sizeof(buf1_256), fout);
 		++startblk;
 	}
 
@@ -1299,7 +1330,7 @@ long write_lif_dir(FILE *fout, char *name, long startblk, long size)
 	dir[29] = puc[0];
 
 	/* write directory */
-	return(fwrite(dir, 1, sizeof(lifdir), fout));
+	return((long)fwrite(dir, 1, sizeof(lifdir), fout));
 }
 
 int nonxdigit_buffer(unsigned char *buffer, int count)

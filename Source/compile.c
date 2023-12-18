@@ -1,7 +1,7 @@
 /*
 HP41UC
 User-Code File Converter/Compiler/De-compiler/Barcode Generator.
-Copyright (c) Leo Duran, 2000-2020.  All rights reserved.
+Copyright (c) Leo Duran, 2000-2023.  All rights reserved.
 
 Build environment: Microsoft Visual Studio or GNU C compiler.
 */
@@ -410,10 +410,11 @@ int get_alpha_postfix(unsigned char *alpha, unsigned char *buffer)
 
 int compile_num(unsigned char *code, unsigned char *num)
 {
-	int i, count;
+	size_t count;
+	int i;
 
 	count = strlen((char *)num);
-	for (i = 0; i < count; ++i) {
+	for (i = 0; i < (int)count; ++i) {
 		if (num[i] == '-')
 			code[i] = 0x1C;
 		else if (num[i] == 'E')
@@ -425,7 +426,7 @@ int compile_num(unsigned char *code, unsigned char *num)
 		}
 	}
 
-	return(count);
+	return((int)count);
 }
 
 int compile_text(unsigned char *code, unsigned char *text, int count)
@@ -868,7 +869,8 @@ int compile_arg3(unsigned char *code, unsigned char *prefix, unsigned char *ind,
 
 int compile_label(unsigned char *code, unsigned char *label, unsigned char *alpha, unsigned char *key)
 {
-	int asn, count;
+	int asn;
+	size_t count;
 
 	asn = get_key(key);
 	count = strlen((char *)alpha);
@@ -876,10 +878,10 @@ int compile_label(unsigned char *code, unsigned char *label, unsigned char *alph
 		_stricmp((char *)label, "LBL") == HP41_OK) {
 		code[0] = 0xC0;
 		code[1] = 0x00;
-		code[2] = 0xF1 + count;
+		code[2] = 0xF1 + (unsigned char)count;
 		code[3] = asn;
 		memcpy(&code[4], alpha, count);
-		return(count + 4);
+		return((int)count + 4);
 	}
 
 	if (count >= MAX_ALPHA)
@@ -978,7 +980,7 @@ int parse_text(unsigned char *text, unsigned char *buffer, int *pcount)
 	int esc_x;
 
 	*pcount = 0;
-	k = strlen((char *)buffer);
+	k = (int)strlen((char *)buffer);
 	if (k == 0)
 		return(1);
 
